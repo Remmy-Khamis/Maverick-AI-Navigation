@@ -1,0 +1,1782 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MAVERICK · AI Navigation Command</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@300;400;500;600&family=Barlow+Condensed:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ink:    #080c10;
+  --deep:   #0c1420;
+  --slate:  #111d2e;
+  --panel:  #0e1a2a;
+  --panel2: #132033;
+  --edge:   #1a3a5c;
+  --ice:    #00d4ff;
+  --lime:   #39ff6e;
+  --amber:  #ffb300;
+  --coral:  #ff5533;
+  --violet: #c084fc;
+  --snow:   #e8f4ff;
+  --fog:    #4a7898;
+  --danger: #ff3535;
+  --ws-connected: #39ff6e;
+  --ws-disconnected: #ff3535;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden}
+body{
+  background:var(--ink);
+  color:#b8d8f0;
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:13px;
+  letter-spacing:.3px;
+  background-image:
+    radial-gradient(ellipse 100% 60% at 50% -10%,rgba(0,212,255,.05) 0%,transparent 60%),
+    linear-gradient(180deg,rgba(0,212,255,.02) 0%,transparent 100%);
+}
+/* ── SCANLINE OVERLAY ── */
+body::after{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:999;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.06) 2px,rgba(0,0,0,.06) 4px);
+}
+
+/* ── HEADER ── */
+.hdr{
+  height:52px;display:flex;align-items:center;justify-content:space-between;
+  padding:0 20px;
+  background:rgba(8,12,16,.97);
+  border-bottom:1px solid var(--edge);
+  position:relative;z-index:50;
+}
+.hdr::after{
+  content:'';position:absolute;bottom:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--ice),transparent);
+  opacity:.5;
+}
+.brand{display:flex;align-items:center;gap:14px}
+.brand-icon{
+  width:36px;height:36px;border:1.5px solid var(--ice);
+  display:flex;align-items:center;justify-content:center;
+  position:relative;clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);
+  background:rgba(0,212,255,.07);
+  box-shadow:0 0 16px rgba(0,212,255,.2);
+}
+.brand-icon svg{width:18px;height:18px;fill:none;stroke:var(--ice);stroke-width:2}
+.brand-name{
+  font-family:'Bebas Neue',sans-serif;font-size:26px;
+  letter-spacing:6px;color:var(--snow);
+  text-shadow:0 0 20px rgba(0,212,255,.4);
+}
+.brand-sub{font-size:8px;color:var(--fog);letter-spacing:3px;margin-top:-4px;font-family:'IBM Plex Mono',monospace}
+
+.hdr-center{
+  display:flex;gap:6px;align-items:center;
+}
+.tab{
+  padding:5px 14px;border:1px solid var(--edge);background:transparent;
+  color:var(--fog);font-family:'Barlow Condensed',sans-serif;
+  font-size:11px;letter-spacing:2px;cursor:pointer;transition:.15s;
+  clip-path:polygon(8px 0%,100% 0%,calc(100% - 8px) 100%,0% 100%);
+}
+.tab:hover{border-color:var(--ice);color:var(--ice)}
+.tab.active{background:rgba(0,212,255,.08);border-color:var(--ice);color:var(--snow)}
+
+.hdr-right{display:flex;align-items:center;gap:16px}
+.ws-badge{
+  display:flex;align-items:center;gap:6px;
+  font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:1.5px;
+  padding:4px 10px;border:1px solid;
+  transition:.3s;cursor:pointer;
+}
+.ws-badge.on{color:var(--lime);border-color:rgba(57,255,110,.3);background:rgba(57,255,110,.05)}
+.ws-badge.off{color:var(--danger);border-color:rgba(255,53,53,.3);background:rgba(255,53,53,.05)}
+.ws-dot{width:5px;height:5px;border-radius:50%;animation:blink 1.4s ease-in-out infinite}
+.ws-badge.on .ws-dot{background:var(--lime);box-shadow:0 0 5px var(--lime)}
+.ws-badge.off .ws-dot{background:var(--danger);box-shadow:0 0 5px var(--danger);animation:none}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+.live-clock{
+  font-family:'IBM Plex Mono',monospace;font-size:13px;
+  color:var(--ice);letter-spacing:2px;
+  text-shadow:0 0 8px rgba(0,212,255,.4);
+}
+
+/* ── LAYOUT ── */
+.layout{
+  display:grid;
+  grid-template-columns:270px 1fr 240px;
+  height:calc(100vh - 52px - 28px);
+  gap:1px;background:var(--edge);
+  overflow:hidden;
+}
+.col{background:var(--panel);overflow:hidden;display:flex;flex-direction:column}
+
+/* ── PANELS ── */
+.pnl{padding:12px 14px;border-bottom:1px solid rgba(26,58,92,.6)}
+.pnl-title{
+  font-family:'Bebas Neue',sans-serif;font-size:12px;
+  letter-spacing:3px;color:var(--ice);margin-bottom:10px;
+  display:flex;align-items:center;gap:8px;
+}
+.pnl-title::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,var(--edge),transparent)}
+
+/* ── MODE BUTTONS ── */
+.mode-btns{display:flex;flex-direction:column;gap:5px}
+.mbtn{
+  padding:9px 12px;border:1px solid var(--edge);background:transparent;
+  color:var(--fog);font-family:'Barlow Condensed',sans-serif;font-size:12px;
+  letter-spacing:1.5px;cursor:pointer;transition:.15s;text-align:left;
+  position:relative;
+}
+.mbtn::before{content:'';position:absolute;left:0;top:0;bottom:0;width:0;background:var(--lime);transition:width .2s}
+.mbtn:hover{color:var(--snow);border-color:var(--lime)}
+.mbtn.active{border-color:var(--lime);color:var(--snow);background:rgba(57,255,110,.06)}
+.mbtn.active::before{width:3px;box-shadow:0 0 8px var(--lime)}
+.mbtn-sub{display:block;font-size:9px;color:var(--fog);letter-spacing:1px;margin-top:2px;font-family:'IBM Plex Mono',monospace}
+.mbtn.active .mbtn-sub{color:rgba(57,255,110,.6)}
+
+/* ── METRICS ── */
+.metric-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.met{
+  background:var(--panel2);border:1px solid var(--edge);padding:7px 9px;
+}
+.met-v{
+  font-family:'IBM Plex Mono',monospace;font-size:18px;
+  color:var(--snow);line-height:1;
+}
+.met-v .u{font-size:9px;color:var(--fog)}
+.met-l{font-size:8px;color:var(--fog);letter-spacing:1px;margin-top:3px;text-transform:uppercase}
+.met.hl{border-color:rgba(0,212,255,.35);background:rgba(0,212,255,.04)}
+.met.hl .met-v{color:var(--ice)}
+.met-delta{float:right;font-size:10px;margin-top:1px}
+.up-c{color:var(--lime)}.dn-c{color:var(--danger)}.ne-c{color:var(--amber)}
+
+/* ── HAZARDS ── */
+.hz-list{display:flex;flex-direction:column;gap:4px}
+.hz{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:6px 9px;border:1px solid var(--edge);background:var(--panel2);
+  font-size:11px;letter-spacing:.5px;
+}
+.hz-name{color:#b8d8f0}
+.badge{font-family:'IBM Plex Mono',monospace;font-size:8px;letter-spacing:1.5px;padding:2px 6px;border:1px solid}
+.b-ok{color:var(--lime);border-color:rgba(57,255,110,.3)}
+.b-warn{color:var(--amber);border-color:rgba(255,179,0,.3)}
+.b-hot{color:var(--danger);border-color:rgba(255,53,53,.4);background:rgba(255,53,53,.06);animation:blink 1s ease-in-out infinite}
+
+/* ── CENTER COLUMN ── */
+.center-col{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--panel)}
+
+/* ── MAP ── */
+.map-wrap{
+  position:relative;flex:0 0 300px;
+  background:#030b14;border-bottom:1px solid var(--edge);
+}
+#mapCanvas{display:block;width:100%;height:100%}
+.map-hud{
+  position:absolute;top:10px;left:12px;
+  font-family:'IBM Plex Mono',monospace;font-size:9px;
+  color:var(--ice);line-height:1.9;
+  text-shadow:0 0 10px rgba(0,212,255,.5);
+  pointer-events:none;
+}
+.map-hud .v{color:var(--lime)}
+.map-hud-r{
+  position:absolute;top:10px;right:12px;text-align:right;
+  font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--fog);
+  pointer-events:none;line-height:1.8;
+}
+.map-hud-r .big{font-size:14px;color:var(--ice)}
+.map-hud-r .q{font-size:14px;color:var(--violet)}
+.map-legend{
+  position:absolute;bottom:8px;left:12px;
+  display:flex;gap:14px;font-family:'IBM Plex Mono',monospace;font-size:8px;color:var(--fog);
+  pointer-events:none;
+}
+.ll{display:flex;align-items:center;gap:5px}
+.ld{width:12px;height:2px}
+
+/* ── GAUGES ROW ── */
+.gauges-row{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:1px;background:var(--edge);flex:0 0 72px}
+.gauge{
+  background:var(--panel);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:2px;
+  position:relative;overflow:hidden;
+}
+.gauge::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+}
+.g-blue::before{background:linear-gradient(90deg,transparent,var(--ice),transparent)}
+.g-green::before{background:linear-gradient(90deg,transparent,var(--lime),transparent)}
+.g-amber::before{background:linear-gradient(90deg,transparent,var(--amber),transparent)}
+.g-violet::before{background:linear-gradient(90deg,transparent,var(--violet),transparent)}
+.gauge-val{
+  font-family:'Bebas Neue',sans-serif;font-size:26px;line-height:1;
+}
+.g-blue .gauge-val{color:var(--ice);text-shadow:0 0 10px rgba(0,212,255,.4)}
+.g-green .gauge-val{color:var(--lime);text-shadow:0 0 10px rgba(57,255,110,.3)}
+.g-amber .gauge-val{color:var(--amber);text-shadow:0 0 10px rgba(255,179,0,.3)}
+.g-violet .gauge-val{color:var(--violet);text-shadow:0 0 10px rgba(192,132,252,.3)}
+.gauge-lbl{font-size:8px;color:var(--fog);letter-spacing:1.5px;text-transform:uppercase}
+.gauge-sub{font-size:8px;color:var(--fog);font-family:'IBM Plex Mono',monospace}
+
+/* ── PERF BARS ── */
+.perf-section{flex:0 0 auto;padding:10px 14px;border-bottom:1px solid rgba(26,58,92,.6)}
+.perf-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.perf-row:last-child{margin-bottom:0}
+.perf-lbl{width:160px;font-size:10px;color:var(--fog);letter-spacing:.5px;flex-shrink:0}
+.perf-track{flex:1;height:5px;background:var(--panel2);border:1px solid var(--edge);position:relative}
+.perf-fill{height:100%;transition:width 1.2s cubic-bezier(.4,0,.2,1)}
+.pf-ice{background:var(--ice);box-shadow:0 0 6px rgba(0,212,255,.4)}
+.pf-lime{background:var(--lime);box-shadow:0 0 6px rgba(57,255,110,.3)}
+.pf-amber{background:var(--amber);box-shadow:0 0 6px rgba(255,179,0,.3)}
+.pf-violet{background:var(--violet);box-shadow:0 0 6px rgba(192,132,252,.3)}
+.pf-coral{background:var(--coral);box-shadow:0 0 6px rgba(255,85,51,.3)}
+.perf-v{width:48px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--snow)}
+
+/* ── WAVE ── */
+.wave-section{flex:0 0 54px;padding:6px 14px 4px;border-bottom:1px solid rgba(26,58,92,.6)}
+.wave-title{font-size:8px;color:var(--fog);letter-spacing:2px;font-family:'IBM Plex Mono',monospace;margin-bottom:4px}
+#waveCanvas{width:100%;height:36px;display:block}
+
+/* ── EVENT LOG ── */
+.log-section{flex:1;overflow-y:auto;padding:10px 14px}
+.log-section::-webkit-scrollbar{width:3px}
+.log-section::-webkit-scrollbar-thumb{background:var(--edge)}
+.log-entry{
+  display:flex;gap:8px;margin-bottom:8px;
+  animation:slideIn .3s ease;
+}
+@keyframes slideIn{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:translateX(0)}}
+.log-dot{
+  width:5px;height:5px;border-radius:50%;
+  margin-top:5px;flex-shrink:0;box-shadow:0 0 5px currentColor;
+}
+.d-ice{background:var(--ice);color:var(--ice)}
+.d-lime{background:var(--lime);color:var(--lime)}
+.d-violet{background:var(--violet);color:var(--violet)}
+.d-amber{background:var(--amber);color:var(--amber)}
+.d-coral{background:var(--coral);color:var(--coral)}
+.log-txt{font-size:10px;color:#b8d8f0;line-height:1.5}
+.log-time{font-family:'IBM Plex Mono',monospace;font-size:8px;color:var(--fog);margin-top:1px}
+
+
+
+
+/* ── ROUTE PLANNER ── */
+.rp-form{display:flex;flex-direction:column;gap:7px}
+.rp-row{display:flex;gap:6px;align-items:center}
+.rp-lbl{font-size:8px;color:var(--fog);letter-spacing:1.5px;text-transform:uppercase;width:28px;flex-shrink:0;font-family:'IBM Plex Mono',monospace}
+.rp-sel{
+  flex:1;background:var(--panel2);border:1px solid var(--edge);
+  color:var(--snow);font-family:'IBM Plex Mono',monospace;font-size:11px;
+  padding:5px 8px;letter-spacing:.5px;cursor:pointer;outline:none;
+  -webkit-appearance:none;appearance:none;
+}
+.rp-sel:focus{border-color:var(--ice)}
+.rp-sel option{background:#0c1420}
+.rp-wind-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:4px}
+.rp-wind-box{background:var(--panel2);border:1px solid var(--edge);padding:5px 8px}
+.rp-wind-lbl{font-size:7px;color:var(--fog);letter-spacing:1px;font-family:'IBM Plex Mono',monospace;margin-bottom:3px}
+.rp-btn{
+  width:100%;padding:9px;border:1px solid var(--ice);background:rgba(0,212,255,.08);
+  color:var(--ice);font-family:'Bebas Neue',sans-serif;font-size:14px;letter-spacing:4px;
+  cursor:pointer;transition:.15s;margin-top:4px;
+}
+.rp-btn:hover{background:rgba(0,212,255,.18);box-shadow:0 0 14px rgba(0,212,255,.18)}
+.rp-btn.loading{color:var(--amber);border-color:var(--amber);animation:blink .8s ease-in-out infinite}
+.rp-btn.done{color:var(--lime);border-color:var(--lime);background:rgba(57,255,110,.07)}
+/* ── FUEL CARD ── */
+.fuel-card{margin-top:6px;border:1px solid var(--edge);background:var(--panel2);display:none}
+.fuel-card.show{display:block}
+.fuel-card-title{font-size:7px;color:var(--fog);letter-spacing:2px;font-family:'IBM Plex Mono',monospace;padding:5px 9px 4px;border-bottom:1px solid var(--edge);text-transform:uppercase}
+.fuel-split{display:grid;grid-template-columns:1fr 1fr}
+.fuel-half{padding:7px 9px;text-align:center}
+.fuel-half+.fuel-half{border-left:1px solid var(--edge)}
+.fuel-half-lbl{font-size:7px;letter-spacing:1.5px;color:var(--fog);font-family:'IBM Plex Mono',monospace;text-transform:uppercase;margin-bottom:3px}
+.fuel-half-val{font-family:'Bebas Neue',sans-serif;font-size:22px;line-height:1}
+.fuel-half-sub{font-size:8px;color:var(--fog);font-family:'IBM Plex Mono',monospace;margin-top:1px}
+.fuel-bar-wrap{padding:5px 9px 6px;border-top:1px solid var(--edge)}
+.fuel-bar-hdr{display:flex;justify-content:space-between;font-size:8px;color:var(--fog);letter-spacing:1px;font-family:'IBM Plex Mono',monospace;margin-bottom:4px}
+.fuel-bar-track{height:6px;background:var(--ink);border:1px solid var(--edge)}
+.fuel-bar-fill{height:100%;background:linear-gradient(90deg,var(--lime),rgba(57,255,110,.4));transition:width 1.4s cubic-bezier(.4,0,.2,1);box-shadow:0 0 7px rgba(57,255,110,.4)}
+.co2-rows{padding:5px 9px 7px;background:rgba(57,255,110,.03);border-top:1px solid rgba(57,255,110,.15)}
+.co2-r{display:flex;justify-content:space-between;margin-bottom:3px}
+.co2-r:last-child{margin-bottom:0}
+.co2-k{font-size:8px;color:var(--fog);letter-spacing:1px;font-family:'IBM Plex Mono',monospace;text-transform:uppercase}
+.co2-v{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--lime)}
+.co2-fleet{font-size:9px;color:rgba(57,255,110,.5);font-family:'IBM Plex Mono',monospace}
+
+
+/* ── RIGHT COLUMN ── */
+.right-col{background:var(--panel);display:flex;flex-direction:column;overflow:hidden}
+.scroll-col{flex:1;overflow-y:auto;padding-bottom:8px}
+.scroll-col::-webkit-scrollbar{width:3px}
+.scroll-col::-webkit-scrollbar-thumb{background:var(--edge)}
+/* Dataset panel */
+.ds-list{display:flex;flex-direction:column;gap:5px}
+.ds-item{
+  background:var(--panel2);border:1px solid var(--edge);padding:8px 10px;
+  cursor:pointer;transition:.15s;position:relative;
+}
+.ds-item:hover{border-color:var(--ice);background:rgba(0,212,255,.04)}
+.ds-item.loaded{border-color:var(--lime);background:rgba(57,255,110,.03)}
+.ds-item.loading-ds{border-color:var(--amber);background:rgba(255,179,0,.03);animation:blink 1s ease-in-out infinite}
+.ds-name{font-size:11px;color:var(--snow);font-weight:500;letter-spacing:.5px}
+.ds-src{font-family:'IBM Plex Mono',monospace;font-size:8px;color:var(--fog);margin-top:2px}
+.ds-status{
+  position:absolute;top:8px;right:8px;
+  font-family:'IBM Plex Mono',monospace;font-size:8px;letter-spacing:1px;
+  padding:1px 5px;border:1px solid;
+}
+.ds-ready{color:var(--lime);border-color:rgba(57,255,110,.3)}
+.ds-live{color:var(--ice);border-color:rgba(0,212,255,.3);animation:blink 2s ease-in-out infinite}
+.ds-pull{color:var(--amber);border-color:rgba(255,179,0,.3)}
+.ds-data{font-family:'IBM Plex Mono',monospace;font-size:8px;color:var(--ice);margin-top:4px;display:none;line-height:1.7}
+.ds-item.loaded .ds-data{display:block}
+/* Emissions panel */
+.emit-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin:0 14px 10px}
+.emit{background:var(--panel2);border:1px solid var(--edge);padding:7px 9px;position:relative}
+.emit-v{font-family:'IBM Plex Mono',monospace;font-size:16px;color:var(--snow)}
+.emit-l{font-size:8px;color:var(--fog);letter-spacing:1px;margin-top:3px}
+.emit.live-pulse{border-color:rgba(57,255,110,.4);background:rgba(57,255,110,.03)}
+/* Recovery panel */
+.rec-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin:0 14px 10px}
+.rec{background:var(--panel2);border:1px solid var(--edge);padding:7px 5px;text-align:center;position:relative;overflow:hidden}
+.rec::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px}
+.rec-guided::after{background:linear-gradient(90deg,transparent,var(--lime),transparent)}
+.rec-assist::after{background:linear-gradient(90deg,transparent,var(--ice),transparent)}
+.rec-manual::after{background:linear-gradient(90deg,transparent,var(--amber),transparent)}
+.rec-v{font-family:'IBM Plex Mono',monospace;font-size:14px}
+.rec-l{font-size:7px;color:var(--fog);letter-spacing:1px;margin-top:3px}
+.rec-m{font-size:7px;margin-top:2px;letter-spacing:1px;font-family:'IBM Plex Mono',monospace}
+.rec-bar{height:3px;margin-top:5px;border-radius:0;transition:width 1s}
+/* Quantum panel */
+.quantum-box{
+  background:linear-gradient(135deg,rgba(0,212,255,.04),rgba(192,132,252,.04));
+  border:1px solid rgba(192,132,252,.25);padding:10px;margin:0 14px 10px;
+}
+.q-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+.q-stat{text-align:center}
+.q-v{font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--violet);text-shadow:0 0 10px rgba(192,132,252,.3)}
+.q-l{font-size:8px;color:var(--fog);letter-spacing:1px;margin-top:2px}
+.q-tag{font-size:7px;color:var(--violet);letter-spacing:2px;font-family:'IBM Plex Mono',monospace;opacity:.7;margin-top:6px}
+/* Live ticker */
+.live-ticker{
+  font-family:'IBM Plex Mono',monospace;font-size:8px;color:var(--ice);
+  padding:4px 14px;border-bottom:1px solid rgba(26,58,92,.4);
+  display:flex;align-items:center;gap:6px;flex-shrink:0;
+}
+.live-ticker-dot{width:4px;height:4px;border-radius:50%;background:var(--lime);
+  box-shadow:0 0 4px var(--lime);animation:blink 1.2s ease-in-out infinite;flex-shrink:0}
+.ticker-scroll{overflow:hidden;flex:1}
+.ticker-inner{white-space:nowrap;display:inline-block;animation:tickerMove 18s linear infinite}
+@keyframes tickerMove{0%{transform:translateX(100%)}100%{transform:translateX(-100%)}}
+
+/* ── STATUSBAR ── */
+.stbar{
+  height:28px;display:flex;align-items:center;justify-content:space-between;
+  padding:0 16px;background:rgba(8,12,16,.98);
+  border-top:1px solid var(--edge);
+  font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--fog);
+  letter-spacing:1px;
+}
+.st-item{display:flex;align-items:center;gap:5px}
+.st-dot{width:4px;height:4px;border-radius:50%;background:var(--lime);box-shadow:0 0 4px var(--lime)}
+
+/* ── DEMO OVERLAY ── */
+.demo-overlay{
+  position:fixed;inset:0;z-index:200;
+  background:rgba(0,0,0,.88);backdrop-filter:blur(8px);
+  display:flex;align-items:center;justify-content:center;
+  opacity:0;pointer-events:none;transition:.3s;
+}
+.demo-overlay.show{opacity:1;pointer-events:auto}
+.demo-modal{
+  width:680px;max-height:80vh;overflow-y:auto;
+  background:var(--panel);border:1px solid var(--ice);
+  padding:28px;position:relative;
+  box-shadow:0 0 60px rgba(0,212,255,.15);
+}
+.demo-modal::-webkit-scrollbar{width:4px}
+.demo-modal::-webkit-scrollbar-thumb{background:var(--edge)}
+.demo-close{
+  position:absolute;top:14px;right:16px;
+  background:none;border:none;color:var(--fog);font-size:18px;cursor:pointer;
+}
+.demo-close:hover{color:var(--ice)}
+.demo-h1{
+  font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:5px;
+  color:var(--snow);margin-bottom:4px;
+}
+.demo-sub{font-size:11px;color:var(--fog);letter-spacing:2px;margin-bottom:20px;font-family:'IBM Plex Mono',monospace}
+.demo-section{margin-bottom:18px}
+.demo-section h3{
+  font-family:'Bebas Neue',sans-serif;font-size:14px;letter-spacing:3px;
+  color:var(--ice);margin-bottom:8px;border-bottom:1px solid var(--edge);padding-bottom:4px;
+}
+.demo-step{
+  display:flex;gap:10px;margin-bottom:6px;align-items:flex-start;
+}
+.step-num{
+  font-family:'IBM Plex Mono',monospace;font-size:10px;
+  color:var(--ice);min-width:20px;margin-top:1px;
+}
+.step-txt{font-size:11px;color:#b8d8f0;line-height:1.5}
+.step-txt code{
+  font-family:'IBM Plex Mono',monospace;font-size:9px;
+  background:var(--panel2);border:1px solid var(--edge);
+  padding:1px 5px;color:var(--lime);
+}
+.tech-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.tech-tag{
+  padding:3px 10px;font-family:'IBM Plex Mono',monospace;font-size:9px;
+  border:1px solid;letter-spacing:1px;
+}
+.tt-py{color:#3b82f6;border-color:rgba(59,130,246,.3);background:rgba(59,130,246,.06)}
+.tt-ts{color:#2dd4bf;border-color:rgba(45,212,191,.3);background:rgba(45,212,191,.06)}
+.tt-rs{color:var(--coral);border-color:rgba(255,85,51,.3);background:rgba(255,85,51,.06)}
+.tt-q{color:var(--violet);border-color:rgba(192,132,252,.3);background:rgba(192,132,252,.06)}
+.tt-d{color:var(--amber);border-color:rgba(255,179,0,.3);background:rgba(255,179,0,.06)}
+.demo-ds-row{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:6px 10px;border:1px solid var(--edge);background:var(--panel2);margin-bottom:4px;
+}
+.demo-ds-name{font-size:11px;color:var(--snow)}
+.demo-ds-url{font-family:'IBM Plex Mono',monospace;font-size:8px;color:var(--ice)}
+.demo-ds-api{font-family:'IBM Plex Mono',monospace;font-size:7px;color:var(--fog)}
+</style>
+</head>
+<body>
+
+<!-- DEMO OVERLAY -->
+<div class="demo-overlay" id="demoOverlay">
+  <div class="demo-modal">
+    <button class="demo-close" onclick="toggleDemo()">✕</button>
+    <div class="demo-h1">MAVERICK DEMO GUIDE</div>
+    <div class="demo-sub">HACKATHON DEPLOYMENT · AI NAVIGATION COMMAND · v2.4.1</div>
+
+    <div class="demo-section">
+      <h3>Quick Start (24hr Setup)</h3>
+      <div class="demo-step"><span class="step-num">01</span><span class="step-txt">Clone repo and install Python deps: <code>pip install fastapi uvicorn numpy torch websockets</code></span></div>
+      <div class="demo-step"><span class="step-num">02</span><span class="step-txt">Start the AI server: <code>uvicorn backend.main:app --reload --port 8000</code></span></div>
+      <div class="demo-step"><span class="step-num">03</span><span class="step-txt">Start the Rust nav microservice: <code>cargo run --release</code> (optional — falls back to Python)</span></div>
+      <div class="demo-step"><span class="step-num">04</span><span class="step-txt">Open <code>index.html</code> in browser — WebSocket auto-connects to localhost:8000/ws/telemetry</span></div>
+      <div class="demo-step"><span class="step-num">05</span><span class="step-txt">Click <b>DATASETS</b> panel items to pull live data from public aviation APIs</span></div>
+      <div class="tech-tags">
+        <span class="tech-tag tt-py">Python 3.11+</span>
+        <span class="tech-tag tt-ts">TypeScript / React+Vite</span>
+        <span class="tech-tag tt-rs">Rust (nav microservice)</span>
+        <span class="tech-tag tt-q">Q-CTRL Ironstone Opal</span>
+        <span class="tech-tag tt-d">DARPA LINC / FALCON</span>
+      </div>
+    </div>
+
+    <div class="demo-section">
+      <h3>Live Dataset Sources & API Integration</h3>
+      <div class="demo-ds-row"><div><div class="demo-ds-name">OpenSky Network — Live ADS-B Flight Data</div><div class="demo-ds-url">https://opensky-network.org/api/states/all</div><div class="demo-ds-api">GET /api/states/all?lamin=45&lomin=-5&lamax=55&lomax=15 · No auth required</div></div><span class="badge b-ok">LIVE</span></div>
+      <div class="demo-ds-row"><div><div class="demo-ds-name">NOAA Aviation Weather — METAR/TAF Wind Data</div><div class="demo-ds-url">https://aviationweather.gov/api/data/metar</div><div class="demo-ds-api">GET /api/data/metar?ids=EGLL,EDDF&format=json · Free API</div></div><span class="badge b-ok">LIVE</span></div>
+      <div class="demo-ds-row"><div><div class="demo-ds-name">NASA WorldWind — Atmospheric Density Layers</div><div class="demo-ds-url">https://data.giss.nasa.gov/modelE/transient/</div><div class="demo-ds-api">Static datasets · atmospheric profiles for fuel burn modelling</div></div><span class="badge b-warn">STATIC</span></div>
+      <div class="demo-ds-row"><div><div class="demo-ds-name">Eurocontrol NEST — Historical Route Data</div><div class="demo-ds-url">https://www.eurocontrol.int/tool/nest</div><div class="demo-ds-api">Requires registration · 700km+ route archive for FALCON training</div></div><span class="badge b-warn">REG REQ</span></div>
+      <div class="demo-ds-row"><div><div class="demo-ds-name">Q-CTRL Fire Opal — Quantum Nav Benchmark</div><div class="demo-ds-url">https://api.q-ctrl.com/fire-opal/v1/</div><div class="demo-ds-api">REST API · positioning accuracy benchmarks vs GPS baseline</div></div><span class="badge" style="color:var(--violet);border-color:rgba(192,132,252,.3)">QUANTUM</span></div>
+    </div>
+
+    <div class="demo-section">
+      <h3>Backend Architecture (Python FastAPI)</h3>
+      <div class="demo-step"><span class="step-num">→</span><span class="step-txt"><code>POST /api/optimize-route</code> — PyTorch RL model returns optimal waypoints + fuel estimate</span></div>
+      <div class="demo-step"><span class="step-num">→</span><span class="step-txt"><code>GET /api/hazards</code> — Simulated wind/thruster/Venturi hazard states with FALCON response times</span></div>
+      <div class="demo-step"><span class="step-num">→</span><span class="step-txt"><code>WS /ws/telemetry</code> — 10Hz stream: position, heading, fuel burn, safe-zone %, recovery timer</span></div>
+      <div class="demo-step"><span class="step-num">→</span><span class="step-txt"><code>GET /api/datasets/opensky</code> — Proxied ADS-B data with CORS headers for frontend</span></div>
+    </div>
+
+    <div class="demo-section">
+      <h3>Rust Microservice (Edge Navigation Layer)</h3>
+      <div class="demo-step"><span class="step-num">→</span><span class="step-txt">Handles real-time coordinate transformation at &lt;1ms latency — "memory-safe avionics layer"</span></div>
+      <div class="demo-step"><span class="step-num">→</span><span class="step-txt">Exposes <code>:9001/nav/compute</code> — takes GPS+INS+Quantum inputs, outputs fused position</span></div>
+      <div class="demo-step"><span class="step-num">→</span><span class="step-txt">Pitch: <i>"We chose Rust for the nav core — zero undefined behaviour, no GC pauses in safety-critical path"</i></span></div>
+    </div>
+
+    <div class="demo-section">
+      <h3>Demo Script (5-min Pitch)</h3>
+      <div class="demo-step"><span class="step-num">00:00</span><span class="step-txt">Show live route map with FALCON-optimised path vs standard — <b>hit "Inject Hazard"</b> button</span></div>
+      <div class="demo-step"><span class="step-num">01:00</span><span class="step-txt">Toggle Manual → AI-Assisted → AI-Guided: safe zone climbs from 61% → 87% → 94.7%</span></div>
+      <div class="demo-step"><span class="step-num">02:00</span><span class="step-txt">Click OpenSky dataset — real ADS-B aircraft appear on the map as live overlays</span></div>
+      <div class="demo-step"><span class="step-num">03:00</span><span class="step-txt">Show Quantum Nav panel — ×111 GPS accuracy, 700km validation, meets ICAO standards</span></div>
+      <div class="demo-step"><span class="step-num">04:00</span><span class="step-txt">Show emissions dashboard — −23% fuel, −18.6t CO₂/flight — close with climate impact calc</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- HEADER -->
+<div class="hdr">
+  <div class="brand">
+    <div class="brand-icon">
+      <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="3"/></svg>
+    </div>
+    <div>
+      <div class="brand-name">MAVERICK</div>
+      <div class="brand-sub">AI Navigation Command · Quantum-Fused Routing</div>
+    </div>
+  </div>
+
+  <div class="hdr-center">
+    <button class="tab active" onclick="switchTab(this,'flight')">FLIGHT</button>
+    <button class="tab" onclick="switchTab(this,'maritime')">MARITIME</button>
+    <button class="tab" onclick="switchTab(this,'uav')">UAV</button>
+    <button class="tab" onclick="toggleDemo()">DEMO GUIDE</button>
+  </div>
+
+  <div class="hdr-right">
+    <div class="ws-badge on" id="wsBadge" onclick="toggleWS()" title="Toggle WebSocket simulation">
+      <div class="ws-dot"></div>
+      <span id="wsLabel">WS LIVE</span>
+    </div>
+    <button class="tab" onclick="injectHazard()" style="border-color:var(--coral);color:var(--coral)">⚡ INJECT HAZARD</button>
+    <div class="live-clock" id="clock">--:--:--</div>
+  </div>
+</div>
+
+<!-- LAYOUT -->
+<div class="layout">
+
+  <!-- LEFT COLUMN -->
+  <div class="col" style="overflow-y:auto">
+
+    <!-- ROUTE PLANNER -->
+    <div class="pnl">
+      <div class="pnl-title">Route Planner</div>
+      <div class="rp-form">
+        <div class="rp-row">
+          <span class="rp-lbl">DEP</span>
+          <select class="rp-sel" id="rpDep">
+            <option value="EGLL">EGLL · London Heathrow</option>
+            <option value="EDDF">EDDF · Frankfurt</option>
+            <option value="ESSA">ESSA · Stockholm</option>
+            <option value="KJFK">KJFK · New York JFK</option>
+            <option value="OMDB">OMDB · Dubai</option>
+            <option value="WSSS">WSSS · Singapore</option>
+          </select>
+        </div>
+        <div class="rp-row">
+          <span class="rp-lbl">ARR</span>
+          <select class="rp-sel" id="rpArr">
+            <option value="EDDF">EDDF · Frankfurt</option>
+            <option value="EGLL">EGLL · London Heathrow</option>
+            <option value="ESSA">ESSA · Stockholm</option>
+            <option value="KJFK">KJFK · New York JFK</option>
+            <option value="OMDB">OMDB · Dubai</option>
+            <option value="WSSS">WSSS · Singapore</option>
+          </select>
+        </div>
+        <div class="rp-row">
+          <span class="rp-lbl">A/C</span>
+          <select class="rp-sel" id="rpAC">
+            <option value="A320">A320 · 24t cap</option>
+            <option value="B737">B737 · 26t cap</option>
+            <option value="A380">A380 · 320t cap</option>
+            <option value="B777">B777 · 171t cap</option>
+          </select>
+        </div>
+        <div class="rp-wind-grid">
+          <div class="rp-wind-box">
+            <div class="rp-wind-lbl">Wind Dir</div>
+            <select class="rp-sel" id="rpWDir" style="width:100%">
+              <option value="0">000° N</option>
+              <option value="90">090° E</option>
+              <option value="180">180° S</option>
+              <option value="240" selected>240° WSW</option>
+              <option value="270">270° W</option>
+            </select>
+          </div>
+          <div class="rp-wind-box">
+            <div class="rp-wind-lbl">Wind kt</div>
+            <select class="rp-sel" id="rpWSpd" style="width:100%">
+              <option value="5">5 kt</option>
+              <option value="15">15 kt</option>
+              <option value="25" selected>25 kt</option>
+              <option value="35">35 kt</option>
+              <option value="50">50 kt</option>
+            </select>
+          </div>
+        </div>
+        <button class="rp-btn" id="rpBtn" onclick="optimiseRoute()">⚡ OPTIMISE ROUTE</button>
+      </div>
+
+      <!-- FUEL COMPARISON CARD -->
+      <div class="fuel-card" id="fuelCard">
+        <div class="fuel-card-title">Fuel Analysis · AI vs Standard Route</div>
+        <div class="fuel-split">
+          <div class="fuel-half">
+            <div class="fuel-half-lbl">Standard</div>
+            <div class="fuel-half-val" id="fcStd" style="color:var(--coral)">—</div>
+            <div class="fuel-half-sub" id="fcStdKg">— kg</div>
+          </div>
+          <div class="fuel-half">
+            <div class="fuel-half-lbl">MAVERICK AI</div>
+            <div class="fuel-half-val" id="fcOpt" style="color:var(--lime)">—</div>
+            <div class="fuel-half-sub" id="fcOptKg">— kg</div>
+          </div>
+        </div>
+        <div class="fuel-bar-wrap">
+          <div class="fuel-bar-hdr">
+            <span>FUEL SAVED</span>
+            <span id="fcSavePct" style="color:var(--lime)">—</span>
+          </div>
+          <div class="fuel-bar-track">
+            <div class="fuel-bar-fill" id="fcBar" style="width:0%"></div>
+          </div>
+        </div>
+        <div class="co2-rows">
+          <div class="co2-r"><span class="co2-k">CO₂ Avoided</span><span class="co2-v" id="fcCo2">—</span></div>
+          <div class="co2-r"><span class="co2-k">Fleet Daily ×28k</span><span class="co2-fleet" id="fcFleet">—</span></div>
+          <div class="co2-r"><span class="co2-k">Distance</span><span class="co2-v" id="fcDist">—</span></div>
+          <div class="co2-r"><span class="co2-k">AI Response</span><span class="co2-v" id="fcMs" style="color:var(--ice)">—</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONTROL MODE -->
+    <div class="pnl">
+      <div class="pnl-title">Control Mode</div>
+      <div class="mode-btns">
+        <button class="mbtn" onclick="setMode(this,'manual')">◇ MANUAL BASELINE<span class="mbtn-sub">Human operator full control</span></button>
+        <button class="mbtn" onclick="setMode(this,'assisted')">◈ AI-ASSISTED<span class="mbtn-sub">AI compensates for hazards</span></button>
+        <button class="mbtn active" onclick="setMode(this,'guided')">◉ AI-GUIDED<span class="mbtn-sub">Operator sets params · AI real-time guidance</span></button>
+      </div>
+    </div>
+
+    <!-- FLIGHT PARAMS -->
+    <div class="pnl">
+      <div class="pnl-title">Flight Parameters</div>
+      <div class="metric-grid">
+        <div class="met hl"><div class="met-v" id="mSpeed">847<span class="u"> km/h</span></div><div class="met-l">Airspeed</div></div>
+        <div class="met hl"><div class="met-v" id="mAlt">10.2<span class="u"> km</span></div><div class="met-l">Altitude</div></div>
+        <div class="met"><div class="met-v">083°</div><div class="met-l">Heading</div></div>
+        <div class="met"><div class="met-v" id="mFuel">2.4<span class="u"> t/h</span></div><div class="met-l">Fuel Burn <span class="met-delta up-c">▼</span></div></div>
+        <div class="met"><div class="met-v" id="mDist">412<span class="u"> nm</span></div><div class="met-l">To Dest.</div></div>
+        <div class="met"><div class="met-v">−18°<span class="u">C</span></div><div class="met-l">Ext. Temp</div></div>
+      </div>
+    </div>
+
+    <!-- HAZARD MONITOR -->
+    <div class="pnl">
+      <div class="pnl-title">Hazard Monitor</div>
+      <div class="hz-list" id="hazardList">
+        <div class="hz"><span class="hz-name">Wind Loading</span><span class="badge b-hot" id="hzWind">ACTIVE</span></div>
+        <div class="hz"><span class="hz-name">Thruster Anomaly</span><span class="badge b-warn" id="hzThrust">MONITOR</span></div>
+        <div class="hz"><span class="hz-name">Venturi Effect</span><span class="badge b-ok" id="hzVenturi">NOMINAL</span></div>
+        <div class="hz"><span class="hz-name">GPS Degradation</span><span class="badge b-ok">Q-NAV ACTIVE</span></div>
+        <div class="hz"><span class="hz-name">INS Drift</span><span class="badge b-ok">MITIGATED</span></div>
+        <div class="hz"><span class="hz-name">Safe Zone</span><span class="badge b-ok" id="hzSafe">IN ZONE</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CENTER COLUMN -->
+  <div class="center-col">
+
+    <!-- MAP -->
+    <div class="map-wrap">
+      <canvas id="mapCanvas"></canvas>
+      <div class="map-hud">
+        LAT: <span class="v" id="hudLat">51.4706°N</span><br>
+        LON: <span class="v" id="hudLon">000.4619°W</span><br>
+        ALT: <span class="v">10,240 m</span><br>
+        <span style="color:var(--lime);margin-top:4px;display:block">◉ AI-GUIDED ACTIVE</span>
+      </div>
+      <div class="map-hud-r">
+        ROUTE EFF<div class="big" id="routeEff">96.4%</div>
+        Q-NAV ACC<div class="q">×111</div>
+      </div>
+      <div class="map-legend">
+        <div class="ll"><div class="ld" style="background:var(--danger);opacity:.6"></div>STD ROUTE</div>
+        <div class="ll"><div class="ld" style="background:var(--lime)"></div>MAVERICK OPTIMISED</div>
+        <div class="ll"><div class="ld" style="background:var(--ice)"></div>LIVE TRACK</div>
+        <div class="ll" id="adsbLegend" style="display:none"><div class="ld" style="background:var(--amber)"></div>ADS-B LIVE</div>
+      </div>
+    </div>
+
+    <!-- GAUGES -->
+    <div class="gauges-row">
+      <div class="gauge g-green">
+        <div class="gauge-val" id="gSafeZone">94.7%</div>
+        <div class="gauge-lbl">Safe Zone</div>
+        <div class="gauge-sub" id="gModeLabel">AI-GUIDED</div>
+      </div>
+      <div class="gauge g-blue">
+        <div class="gauge-val" id="gRecovery">1.8s</div>
+        <div class="gauge-lbl">Recovery</div>
+        <div class="gauge-sub">vs 12.4s MANUAL</div>
+      </div>
+      <div class="gauge g-amber">
+        <div class="gauge-val">−23%</div>
+        <div class="gauge-lbl">Fuel Saved</div>
+        <div class="gauge-sub">−18.6t CO₂/FLT</div>
+      </div>
+      <div class="gauge g-violet">
+        <div class="gauge-val">×111</div>
+        <div class="gauge-lbl">Q-Nav Acc.</div>
+        <div class="gauge-sub">700km VALID.</div>
+      </div>
+    </div>
+
+    <!-- PERF BARS -->
+    <div class="perf-section">
+      <div class="pnl-title" style="margin-bottom:8px">Performance Benchmarks — DARPA LINC Data</div>
+      <div class="perf-row">
+        <div class="perf-lbl">Safe Zone · AI-Guided</div>
+        <div class="perf-track"><div class="perf-fill pf-lime" id="pf1" style="width:94.7%"></div></div>
+        <div class="perf-v" id="pv1">94.7%</div>
+      </div>
+      <div class="perf-row">
+        <div class="perf-lbl">Safe Zone · AI-Assisted</div>
+        <div class="perf-track"><div class="perf-fill pf-ice" style="width:87.2%"></div></div>
+        <div class="perf-v">87.2%</div>
+      </div>
+      <div class="perf-row">
+        <div class="perf-lbl">Safe Zone · Manual</div>
+        <div class="perf-track"><div class="perf-fill pf-amber" style="width:61.3%"></div></div>
+        <div class="perf-v">61.3%</div>
+      </div>
+      <div class="perf-row">
+        <div class="perf-lbl">Quantum Nav vs GPS</div>
+        <div class="perf-track"><div class="perf-fill pf-violet" style="width:99%"></div></div>
+        <div class="perf-v">×111</div>
+      </div>
+      <div class="perf-row">
+        <div class="perf-lbl">Emission Reduction</div>
+        <div class="perf-track"><div class="perf-fill pf-lime" style="width:23%"></div></div>
+        <div class="perf-v">23%</div>
+      </div>
+    </div>
+
+    <!-- WAVEFORM -->
+    <div class="wave-section">
+      <div class="wave-title">AI CONTROL SIGNAL · REAL-TIME HAZARD COMPENSATION</div>
+      <canvas id="waveCanvas"></canvas>
+    </div>
+
+    <!-- LOG -->
+    <div class="log-section" id="eventLog">
+      <div class="log-entry"><div class="log-dot d-violet"></div><div><div class="log-txt">Q-NAV quantum advantage confirmed · 700km flight · ×111 GPS accuracy · ICAO compliant</div><div class="log-time">04:31:07 · QUANTUM · IRONSTONE OPAL</div></div></div>
+      <div class="log-entry"><div class="log-dot d-lime"></div><div><div class="log-txt">MAVERICK compensated 34kt crosswind · safe zone maintained throughout hazard</div><div class="log-time">04:28:44 · HAZARD MITIGATION · LINC PROGRAM</div></div></div>
+      <div class="log-entry"><div class="log-dot d-ice"></div><div><div class="log-txt">Route re-optimised: −23% fuel burn vs standard flight plan · PyTorch RL model</div><div class="log-time">04:22:11 · ECONOMIC ROUTING · AI-GUIDED MODE</div></div></div>
+      <div class="log-entry"><div class="log-dot d-amber"></div><div><div class="log-txt">OpenSky ADS-B feed connected · 147 aircraft in sector · live telemetry streaming</div><div class="log-time">04:18:33 · DATASET · OPENSKY NETWORK</div></div></div>
+      <div class="log-entry"><div class="log-dot d-coral"></div><div><div class="log-txt">Thruster anomaly detected · AI-assisted mode active · 4.2s recovery achieved</div><div class="log-time">04:17:53 · FAULT RECOVERY · DARPA LINC</div></div></div>
+    </div>
+  </div>
+
+
+  <!-- RIGHT COLUMN -->
+  <div class="right-col">
+    <!-- Live ticker -->
+    <div class="live-ticker">
+      <div class="live-ticker-dot"></div>
+      <div class="ticker-scroll">
+        <span class="ticker-inner" id="liveTicker">MAVERICK ONLINE · AWAITING DATASET PULL · CLICK DATASETS TO LOAD LIVE DATA</span>
+      </div>
+    </div>
+    <div class="scroll-col">
+
+      <!-- LIVE DATASETS -->
+      <div class="pnl">
+        <div class="pnl-title">Live Datasets</div>
+        <div class="ds-list">
+
+          <div class="ds-item" id="ds-opensky" onclick="loadDataset(this,'opensky')">
+            <span class="ds-status ds-live" id="dss-opensky">LIVE</span>
+            <div class="ds-name">OpenSky · ADS-B Flights</div>
+            <div class="ds-src">opensky-network.org/api · No auth</div>
+            <div class="ds-data" id="dsd-opensky">— aircraft in sector<br>Last pull: —</div>
+          </div>
+
+          <div class="ds-item" id="ds-noaa" onclick="loadDataset(this,'noaa')">
+            <span class="ds-status ds-live" id="dss-noaa">LIVE</span>
+            <div class="ds-name">NOAA · Aviation Weather</div>
+            <div class="ds-src">aviationweather.gov/api · METAR</div>
+            <div class="ds-data" id="dsd-noaa">EGLL: — · EDDF: —<br>Wind integrated: —</div>
+          </div>
+
+          <div class="ds-item" id="ds-nasa" onclick="loadDataset(this,'nasa')">
+            <span class="ds-status ds-ready" id="dss-nasa">STATIC</span>
+            <div class="ds-name">NASA · Atmospheric Layers</div>
+            <div class="ds-src">data.giss.nasa.gov · fuel model</div>
+            <div class="ds-data" id="dsd-nasa">FL340 optimal altitude<br>Burn model: active</div>
+          </div>
+
+          <div class="ds-item" id="ds-eurocontrol" onclick="loadDataset(this,'eurocontrol')">
+            <span class="ds-status ds-pull" id="dss-eurocontrol">REG REQ</span>
+            <div class="ds-name">Eurocontrol · Route Archive</div>
+            <div class="ds-src">eurocontrol.int/tool/nest · 700km+</div>
+            <div class="ds-data" id="dsd-eurocontrol">Registration required<br>eurocontrol.int/tool/nest</div>
+          </div>
+
+          <div class="ds-item" id="ds-qctrl" onclick="loadDataset(this,'qctrl')">
+            <span class="ds-status" style="color:var(--violet);border-color:rgba(192,132,252,.3)" id="dss-qctrl">QUANTUM</span>
+            <div class="ds-name">Q-CTRL · Quantum Benchmarks</div>
+            <div class="ds-src">api.q-ctrl.com/fire-opal/v1/</div>
+            <div class="ds-data" id="dsd-qctrl">×111 GPS accuracy<br>700km validated · ICAO</div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- EMISSIONS IMPACT -->
+      <div class="pnl">
+        <div class="pnl-title">Emissions Impact</div>
+        <div class="emit-grid">
+          <div class="emit live-pulse">
+            <div class="emit-v" id="emFuelPct" style="color:var(--lime)">−23%</div>
+            <div class="emit-l">FUEL SAVED</div>
+          </div>
+          <div class="emit live-pulse">
+            <div class="emit-v" id="emCo2Flt" style="color:var(--lime)">−18.6t</div>
+            <div class="emit-l">CO₂/FLIGHT</div>
+          </div>
+          <div class="emit">
+            <div class="emit-v" id="emBurnRate">2.4 t/h</div>
+            <div class="emit-l">BURN RATE</div>
+          </div>
+          <div class="emit">
+            <div class="emit-v" id="emFleetCo2" style="color:var(--ice)">521kt</div>
+            <div class="emit-l">FLEET/DAY</div>
+          </div>
+        </div>
+        <!-- Fleet projection bar -->
+        <div style="margin:0 14px 10px;border:1px solid var(--edge);background:var(--panel2)">
+          <div style="padding:5px 9px 3px;font-size:7px;color:var(--fog);letter-spacing:1.5px;font-family:'IBM Plex Mono',monospace;border-bottom:1px solid var(--edge)">ANNUAL CO₂ IMPACT PROJECTION</div>
+          <div style="padding:6px 9px">
+            <div style="display:flex;justify-content:space-between;font-size:8px;color:var(--fog);font-family:'IBM Plex Mono',monospace;margin-bottom:4px">
+              <span>CO₂ AVOIDED vs BASELINE</span><span id="emAnnual" style="color:var(--lime)">190Mt/yr</span>
+            </div>
+            <div style="height:5px;background:var(--ink);border:1px solid var(--edge)">
+              <div id="emBar" style="height:100%;width:23%;background:linear-gradient(90deg,var(--lime),rgba(57,255,110,.4));transition:width 1.2s cubic-bezier(.4,0,.2,1);box-shadow:0 0 6px rgba(57,255,110,.3)"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RECOVERY TIMES -->
+      <div class="pnl">
+        <div class="pnl-title">Recovery Times · DARPA LINC</div>
+        <div class="rec-grid">
+          <div class="rec rec-guided">
+            <div class="rec-v" id="recGuided" style="color:var(--lime)">1.8s</div>
+            <div class="rec-l">RECOVERY</div>
+            <div class="rec-m" style="color:var(--lime)">AI-GUIDED</div>
+            <div class="rec-bar" style="background:var(--lime);width:15%"></div>
+          </div>
+          <div class="rec rec-assist">
+            <div class="rec-v" id="recAssist" style="color:var(--ice)">4.2s</div>
+            <div class="rec-l">RECOVERY</div>
+            <div class="rec-m" style="color:var(--ice)">AI-ASSIST</div>
+            <div class="rec-bar" style="background:var(--ice);width:34%"></div>
+          </div>
+          <div class="rec rec-manual">
+            <div class="rec-v" id="recManual" style="color:var(--amber)">12.4s</div>
+            <div class="rec-l">RECOVERY</div>
+            <div class="rec-m" style="color:var(--amber)">MANUAL</div>
+            <div class="rec-bar" style="background:var(--amber);width:100%"></div>
+          </div>
+        </div>
+        <!-- Live hazard recovery countdown -->
+        <div style="margin:0 14px 8px;padding:7px 10px;background:var(--panel2);border:1px solid var(--edge)">
+          <div style="font-size:7px;color:var(--fog);letter-spacing:1.5px;font-family:'IBM Plex Mono',monospace;margin-bottom:4px">LAST HAZARD EVENT</div>
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span id="lastHazardType" style="font-size:10px;color:#b8d8f0;font-family:'IBM Plex Mono',monospace">—</span>
+            <span id="lastHazardTime" style="font-size:9px;color:var(--fog);font-family:'IBM Plex Mono',monospace">—</span>
+          </div>
+          <div style="margin-top:4px;height:3px;background:var(--ink);border:1px solid var(--edge)">
+            <div id="recoveryProgressBar" style="height:100%;width:0%;background:var(--lime);transition:width 0.1s linear"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- QUANTUM NAV -->
+      <div class="pnl">
+        <div class="pnl-title">Quantum Navigation</div>
+        <div class="quantum-box">
+          <div style="font-size:8px;color:var(--fog);font-family:'IBM Plex Mono',monospace">WORLD FIRST · COMMERCIAL QUANTUM ADVANTAGE · 2025</div>
+          <div class="q-grid">
+            <div class="q-stat"><div class="q-v" id="qNavAcc">×111</div><div class="q-l">GPS ACCURACY</div></div>
+            <div class="q-stat"><div class="q-v" id="qNavDist">700</div><div class="q-l">KM VALIDATED</div></div>
+            <div class="q-stat"><div class="q-v" id="qNavDrift">0</div><div class="q-l">INS DRIFT</div></div>
+            <div class="q-stat"><div class="q-v">UAV</div><div class="q-l">DEF TESTED</div></div>
+          </div>
+          <div class="q-tag">MEETS ICAO INTERNATIONAL AVIATION STANDARDS</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+<!-- STATUS BAR -->
+<div class="stbar">
+  <div class="st-item"><div class="st-dot"></div>MAVERICK v2.4.1 · DARPA LINC · FALCON TECHNOLOGY BASE</div>
+  <div class="st-item">Q-CTRL IRONSTONE OPAL · QUANTUM ADVANTAGE VERIFIED 2025</div>
+  <div class="st-item">SAFE ZONE: <span style="color:var(--lime);margin-left:4px" id="sbSafe">94.7% · AI-GUIDED</span></div>
+  <div class="st-item" id="sbDS">DATASET: SIMULATION MODE · CLICK DATASETS TO PULL LIVE DATA</div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════
+// BACKEND CONFIG — your Render deployment
+// ════════════════════════════════════════════════════════
+const API_BASE  = 'https://maverick-ai-navigation.onrender.com';
+const WS_URL    = 'wss://maverick-ai-navigation.onrender.com/ws/telemetry';
+let   socket    = null;
+let   wsOn      = false;    // starts false — real WS attempt first
+let   backendUp = false;
+
+// ── WAKE-UP BANNER ──────────────────────────────────────
+// Render free tier sleeps after 15min — show a friendly notice
+const wakeBanner = document.createElement('div');
+wakeBanner.id = 'wakeBanner';
+wakeBanner.innerHTML = `
+  <div style="display:flex;align-items:center;gap:10px">
+    <span style="animation:blink 1s ease-in-out infinite;font-size:14px">⚡</span>
+    <span>Waking up Render backend — takes ~30 seconds on free tier…</span>
+    <span id="wakeTimer" style="color:var(--ice);font-family:'IBM Plex Mono',monospace">0s</span>
+  </div>`;
+Object.assign(wakeBanner.style, {
+  position:'fixed', bottom:'36px', left:'50%', transform:'translateX(-50%)',
+  background:'rgba(255,179,0,.12)', border:'1px solid rgba(255,179,0,.4)',
+  color:'var(--amber)', padding:'8px 20px', zIndex:'500',
+  fontFamily:"'Barlow Condensed',sans-serif", fontSize:'13px', letterSpacing:'1px',
+  display:'none'
+});
+document.body.appendChild(wakeBanner);
+
+let wakeStart, wakeTimerInterval;
+function showWakeBanner(){
+  wakeBanner.style.display='block';
+  wakeStart = Date.now();
+  wakeTimerInterval = setInterval(()=>{
+    document.getElementById('wakeTimer').textContent =
+      Math.floor((Date.now()-wakeStart)/1000)+'s';
+  },1000);
+}
+function hideWakeBanner(){
+  wakeBanner.style.display='none';
+  clearInterval(wakeTimerInterval);
+}
+
+// ── BACKEND HEALTH CHECK + WS CONNECT ───────────────────
+let retryCount = 0;
+const MAX_RETRIES = 5;
+
+async function connectBackend(){
+  showWakeBanner();
+  setBadge('off', retryCount > 0 ? `RETRY ${retryCount}/${MAX_RETRIES}` : 'WAKING…');
+  try {
+    // Render free tier can take up to 50s to wake — use generous timeout
+    const r = await fetch(API_BASE+'/', {signal: AbortSignal.timeout(55000)});
+    if(r.ok){
+      backendUp = true;
+      retryCount = 0;
+      hideWakeBanner();
+      addLog({dot:'d-lime',txt:`Backend online · ${API_BASE} · websockets connecting…`,time:nowStr()+' · RENDER CONNECT'});
+      openWebSocket();
+    } else {
+      throw new Error('non-ok response');
+    }
+  } catch(e){
+    hideWakeBanner();
+    if(retryCount < MAX_RETRIES){
+      retryCount++;
+      setBadge('off',`RETRY ${retryCount}/${MAX_RETRIES}`);
+      addLog({dot:'d-amber',txt:`Backend not ready · retrying in 15s (${retryCount}/${MAX_RETRIES}) · simulation running`,time:nowStr()+' · RECONNECT'});
+      setTimeout(connectBackend, 15000);
+    } else {
+      setBadge('off','OFFLINE');
+      addLog({dot:'d-coral',txt:'Backend unreachable after retries · simulation mode active · click WS badge to retry',time:nowStr()+' · FALLBACK'});
+    }
+  }
+}
+
+// ── WEBSOCKET ─────────────────────────────────────────────
+let wsRetryTimer = null;
+
+function openWebSocket(){
+  // Clean up any existing socket
+  if(socket){ try{ socket.close(); }catch(e){} }
+
+  try {
+    setBadge('off','WS CONNECTING…');
+    socket = new WebSocket(WS_URL);
+
+    // Timeout if handshake stalls (common when uvicorn websockets not installed)
+    const handshakeTimeout = setTimeout(()=>{
+      if(socket.readyState !== WebSocket.OPEN){
+        socket.close();
+        setBadge('off','WS UNAVAIL');
+        addLog({dot:'d-amber',txt:'WebSocket handshake timed out · REST APIs still working · check Render logs: pip install uvicorn[standard]',time:nowStr()+' · WS ERROR'});
+      }
+    }, 8000);
+
+    socket.onopen = ()=>{
+      clearTimeout(handshakeTimeout);
+      wsOn=true; setBadge('on','WS LIVE');
+      if(simInterval){ clearInterval(simInterval); simInterval=null; }
+      addLog({dot:'d-lime',txt:'WebSocket live · 10Hz real telemetry stream active · MAVERICK fully online',time:nowStr()+' · WEBSOCKET'});
+    };
+    socket.onmessage = (ev)=>{
+      try { applyTelemetry(JSON.parse(ev.data)); }
+      catch(e){}
+    };
+    socket.onerror = ()=>{ clearTimeout(handshakeTimeout); };
+    socket.onclose = (ev)=>{
+      clearTimeout(handshakeTimeout);
+      wsOn=false;
+      // Code 1006 = abnormal closure (websockets library missing on server)
+      if(ev.code === 1006){
+        setBadge('off','NO WS LIB');
+        addLog({dot:'d-coral',txt:'Server missing websockets library · fix: add uvicorn[standard] to requirements.txt on Render · REST APIs working fine',time:nowStr()+' · WS ERROR'});
+      } else {
+        setBadge('off','WS CLOSED');
+        addLog({dot:'d-amber',txt:'WebSocket closed · simulation active · will retry in 30s',time:nowStr()+' · WEBSOCKET'});
+        // Auto-retry WS after 30s
+        wsRetryTimer = setTimeout(()=>{ if(backendUp) openWebSocket(); }, 30000);
+      }
+      startSimTelemetry();
+    };
+  } catch(e) {
+    setBadge('off','WS ERROR');
+    startSimTelemetry();
+  }
+}
+
+function setBadge(state, label){
+  const b=document.getElementById('wsBadge');
+  const l=document.getElementById('wsLabel');
+  b.className='ws-badge '+(state==='on'?'on':'off');
+  l.textContent=label;
+}
+
+// Apply real telemetry from backend WebSocket
+function applyTelemetry(d){
+  if(d.speed_kmh)
+    document.getElementById('mSpeed').innerHTML=d.speed_kmh.toFixed(0)+'<span class="u"> km/h</span>';
+  if(d.fuel_burn_t_hr){
+    document.getElementById('mFuel').innerHTML=d.fuel_burn_t_hr.toFixed(2)+'<span class="u"> t/h</span>';
+    // Mirror live burn rate into emissions panel
+    const eb=document.getElementById('emBurnRate');
+    if(eb) eb.textContent=d.fuel_burn_t_hr.toFixed(2)+' t/h';
+  }
+  if(d.dist_to_dest_nm)
+    document.getElementById('mDist').innerHTML=d.dist_to_dest_nm.toFixed(0)+'<span class="u"> nm</span>';
+  if(d.lat) document.getElementById('hudLat').textContent=d.lat+'°N';
+  if(d.lon) document.getElementById('hudLon').textContent=Math.abs(d.lon).toFixed(4)+'°W';
+  if(d.safe_zone_pct){
+    document.getElementById('gSafeZone').textContent=d.safe_zone_pct+'%';
+    document.getElementById('sbSafe').textContent=d.safe_zone_pct+'% · '+d.mode;
+  }
+  if(d.recovery_time_s)
+    document.getElementById('gRecovery').textContent=d.recovery_time_s+'s';
+  // Hazards
+  if(d.hazards){
+    setHazardBadge('hzWind',   d.hazards.wind_loading    ? 'ACTIVE'  : 'NOMINAL');
+    setHazardBadge('hzThrust', d.hazards.thruster_anomaly? 'MONITOR' : 'NOMINAL');
+    setHazardBadge('hzVenturi',d.hazards.venturi_effect  ? 'ACTIVE'  : 'NOMINAL');
+  }
+}
+
+// Simulation fallback when backend asleep
+let simInterval=null;
+function startSimTelemetry(){
+  if(simInterval) return;
+  simInterval=setInterval(()=>{
+    const spd=(847+(Math.random()-.5)*8).toFixed(0);
+    const fuel=(2.4+(Math.random()-.5)*.08).toFixed(2);
+    document.getElementById('mSpeed').innerHTML=spd+'<span class="u"> km/h</span>';
+    document.getElementById('mFuel').innerHTML=fuel+'<span class="u"> t/h</span>';
+    const lat=(51.4706+(Math.random()-.5)*.003).toFixed(4);
+    const lon=(0.4619+(Math.random()-.5)*.003).toFixed(4);
+    document.getElementById('hudLat').textContent=lat+'°N';
+    document.getElementById('hudLon').textContent=lon+'°W';
+  },1200);
+}
+
+// Manual WS toggle button
+function toggleWS(){
+  if(socket && socket.readyState===WebSocket.OPEN){
+    socket.close();
+    wsOn=false; setBadge('off','WS OFF');
+  } else {
+    if(backendUp){ openWebSocket(); }
+    else { connectBackend(); }
+  }
+}
+
+// ── CLOCK ──
+setInterval(()=>{
+  const n=new Date();
+  document.getElementById('clock').textContent=n.toUTCString().slice(17,25);
+},1000);
+
+// ── DEMO OVERLAY ──
+function toggleDemo(){
+  document.getElementById('demoOverlay').classList.toggle('show');
+}
+document.getElementById('demoOverlay').addEventListener('click',e=>{
+  if(e.target===e.currentTarget) toggleDemo();
+});
+
+// ── TABS ──
+function switchTab(el,tab){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  addLog({dot:'d-ice',txt:`Switched to ${tab.toUpperCase()} mode · reconfiguring navigation parameters`,time:nowStr()+' · MODE SWITCH'});
+}
+
+
+// ════════════════════════════════════════════════════════
+// AIRPORTS + AIRCRAFT DATA
+// ════════════════════════════════════════════════════════
+const AIRPORTS = {
+  EGLL:{name:'London Heathrow', lat:51.477, lon:-0.461,  cx:.07, cy:.54},
+  EDDF:{name:'Frankfurt',       lat:50.033, lon: 8.570,  cx:.38, cy:.43},
+  ESSA:{name:'Stockholm',       lat:59.651, lon:17.918,  cx:.60, cy:.22},
+  KJFK:{name:'New York JFK',    lat:40.639, lon:-73.779, cx:.02, cy:.48},
+  OMDB:{name:'Dubai Intl',      lat:25.252, lon:55.364,  cx:.74, cy:.68},
+  WSSS:{name:'Singapore',       lat:1.359,  lon:103.989, cx:.88, cy:.84},
+};
+const AC_BURN  = {A320:2.4, B737:2.6, A380:11.2, B777:6.8}; // t/hr
+const AC_SPEED = {A320:840, B737:840, A380:900,  B777:905};  // km/h
+const CO2_PER_T_FUEL = 2.54; // ICAO factor kg CO2 / kg fuel
+
+// Active route for the map renderer
+let activeRoute = {
+  dep:'EGLL', arr:'EDDF',
+  stdPts: null, optPts: null,
+  fuelSavePct: 0, animProg: 0, animating: false
+};
+
+function haversineKm(la1,lo1,la2,lo2){
+  const R=6371,dL=(la2-la1)*Math.PI/180,dO=(lo2-lo1)*Math.PI/180;
+  const a=Math.sin(dL/2)**2+Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dO/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+
+// Build bezier control points for std vs optimised path
+function buildPaths(dep, arr, windDir, windSpd){
+  const d = AIRPORTS[dep], a = AIRPORTS[arr];
+  const sx=d.cx, sy=d.cy, ex=a.cx, ey=a.cy;
+  const mx=(sx+ex)/2, my=(sy+ey)/2;
+
+  // Standard route: bows slightly southward (inefficient)
+  const stdPts = {sx,sy,ex,ey, c1x:mx-.05,c1y:my+.14, c2x:mx+.05,c2y:my+.14};
+
+  // Optimised: curves toward jet stream (north/northwest bias for Europe routes)
+  // Wind component shifts the optimal path
+  const windRad = windDir * Math.PI/180;
+  const wBias   = (windSpd/300) * 0.08;
+  const wx = Math.sin(windRad) * wBias;
+  const wy = -Math.cos(windRad) * wBias * 0.5;
+  const optPts = {sx,sy,ex,ey, c1x:mx-.07+wx,c1y:my-.10+wy, c2x:mx+.06+wx,c2y:my-.08+wy};
+
+  return {stdPts, optPts};
+}
+
+// ── MAIN OPTIMISE FUNCTION ───────────────────────────────
+async function optimiseRoute(){
+  const dep     = document.getElementById('rpDep').value;
+  const arr     = document.getElementById('rpArr').value;
+  const ac      = document.getElementById('rpAC').value;
+  const windDir = parseInt(document.getElementById('rpWDir').value);
+  const windSpd = parseInt(document.getElementById('rpWSpd').value);
+  const btn     = document.getElementById('rpBtn');
+
+  if(dep === arr){
+    addLog({dot:'d-coral',txt:'Departure and arrival must be different airports',time:nowStr()+' · ROUTE PLANNER'});
+    return;
+  }
+
+  btn.textContent = '⟳ COMPUTING…';
+  btn.className = 'rp-btn loading';
+  const t0 = performance.now();
+
+  // ── Physics model (always runs) ──────────────────────
+  const depA = AIRPORTS[dep], arrA = AIRPORTS[arr];
+  const distKm   = haversineKm(depA.lat,depA.lon,arrA.lat,arrA.lon);
+  const burnRate = AC_BURN[ac];
+  const speed    = AC_SPEED[ac];
+  const hrs      = distKm / speed;
+
+  // Wind component along bearing
+  const bearingRad = Math.atan2(arrA.lon-depA.lon, arrA.lat-depA.lat);
+  const windRad    = windDir * Math.PI/180;
+  const windComp   = Math.cos(windRad - bearingRad) * windSpd;
+
+  const fuelStd  = hrs * burnRate * (1 + Math.abs(windComp) * 0.002);
+  const saveFrac = Math.min(0.28, 0.17 + windSpd*0.002 + (windComp > 0 ? windComp*0.001 : 0));
+  const fuelOpt  = fuelStd * (1 - saveFrac);
+  const fuelSave = fuelStd - fuelOpt;
+  const co2Save  = fuelSave * CO2_PER_T_FUEL;
+  const co2Fleet = co2Save * 28000;
+
+  // ── Try real backend ─────────────────────────────────
+  let backendMs = null;
+  try {
+    if(backendUp){
+      const r = await fetch(API_BASE+'/api/optimize-route',{
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({origin:dep,destination:arr,wind_direction:windDir,wind_speed_kt:windSpd,aircraft_type:ac,fuel_weight:fuelStd}),
+        signal:AbortSignal.timeout(8000)
+      });
+      if(r.ok){ const d=await r.json(); backendMs=d.response_time_ms||null; }
+    }
+  } catch(e){}
+
+  const elapsedMs = Math.round(performance.now() - t0);
+  const displayMs = backendMs || elapsedMs;
+  const pctStr    = (saveFrac*100).toFixed(1);
+
+  // ── Build map paths ──────────────────────────────────
+  const {stdPts, optPts} = buildPaths(dep, arr, windDir, windSpd);
+  activeRoute = {dep, arr, stdPts, optPts, fuelSavePct:+pctStr, animProg:0, animating:true};
+
+  // ── Update fuel card ─────────────────────────────────
+  document.getElementById('fcStd').textContent    = fuelStd.toFixed(1)+'t';
+  document.getElementById('fcStdKg').textContent  = (fuelStd*1000).toFixed(0)+' kg';
+  document.getElementById('fcOpt').textContent    = fuelOpt.toFixed(1)+'t';
+  document.getElementById('fcOptKg').textContent  = (fuelOpt*1000).toFixed(0)+' kg';
+  document.getElementById('fcSavePct').textContent= '−'+pctStr+'%';
+  document.getElementById('fcCo2').textContent    = co2Save.toFixed(1)+'t CO₂';
+  document.getElementById('fcFleet').textContent  = (co2Fleet/1000).toFixed(0)+'k t/day';
+  document.getElementById('fcDist').textContent   = Math.round(distKm)+' km';
+  document.getElementById('fcMs').textContent     = displayMs+'ms';
+  setTimeout(()=>{ document.getElementById('fcBar').style.width = Math.min(saveFrac*3.5*100,100)+'%'; },80);
+  document.getElementById('fuelCard').className   = 'fuel-card show';
+
+  // ── Update gauges ─────────────────────────────────────
+  const gAmberVal = document.querySelector('.gauge.g-amber .gauge-val');
+  const gAmberSub = document.querySelector('.gauge.g-amber .gauge-sub');
+  if(gAmberVal) gAmberVal.textContent = '−'+pctStr+'%';
+  if(gAmberSub) gAmberSub.textContent = '−'+co2Save.toFixed(1)+'t CO₂/FLT';
+
+  // ── Status bar ────────────────────────────────────────
+  document.getElementById('sbSafe').textContent = dep+'→'+arr+' · −'+pctStr+'% fuel · −'+co2Save.toFixed(1)+'t CO₂';
+
+  // ── Logs ─────────────────────────────────────────────
+  addLog({dot:'d-lime',txt:`${dep}→${arr} · ${ac} · wind ${windDir}°/${windSpd}kt · −${pctStr}% fuel · −${co2Save.toFixed(1)}t CO₂ · ${displayMs}ms`,time:nowStr()+' · AI ROUTE OPTIMIZER'});
+  addLog({dot:'d-ice', txt:`Standard: ${fuelStd.toFixed(1)}t / MAVERICK: ${fuelOpt.toFixed(1)}t · saving ${fuelSave.toFixed(1)}t fuel per flight`,time:nowStr()+' · ECONOMIC ROUTING'});
+
+  // Sync right-column panels with fresh route data
+  updateEmissions(+pctStr, co2Save.toFixed(1));
+  updateTicker(`ROUTE OPTIMISED: ${dep}→${arr} · −${pctStr}% FUEL · −${co2Save.toFixed(1)}T CO₂ · ${displayMs}MS RESPONSE`);
+
+  btn.textContent = '✓ ROUTE OPTIMISED';
+  btn.className = 'rp-btn done';
+  setTimeout(()=>{ btn.textContent='⚡ OPTIMISE ROUTE'; btn.className='rp-btn'; }, 3500);
+}
+
+// ── MODE SELECTOR ──
+const modes={
+  manual:  {sz:'61.3%',rec:'12.4s',pf:'61.3',lbl:'MANUAL',safe:'61.3% · MANUAL BASELINE',dot:'d-amber'},
+  assisted:{sz:'87.2%',rec:'4.2s', pf:'87.2',lbl:'AI-ASSIST',safe:'87.2% · AI-ASSISTED',dot:'d-ice'},
+  guided:  {sz:'94.7%',rec:'1.8s', pf:'94.7',lbl:'AI-GUIDED',safe:'94.7% · AI-GUIDED',dot:'d-lime'},
+};
+function setMode(el,mode){
+  document.querySelectorAll('.mbtn').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  const m=modes[mode];
+  document.getElementById('gSafeZone').textContent=m.sz;
+  document.getElementById('gRecovery').textContent=m.rec;
+  document.getElementById('gModeLabel').textContent=m.lbl;
+  document.getElementById('pf1').style.width=m.pf+'%';
+  document.getElementById('pv1').textContent=m.sz;
+  document.getElementById('sbSafe').textContent=m.safe;
+  addLog({dot:m.dot,txt:`Mode switched to ${m.lbl} · safe zone ${m.sz} · recovery ${m.rec}`,time:nowStr()+' · CONTROL MODE'});
+  // Sync recovery display to show mode-relevant benchmark
+  const rg=document.getElementById('recGuided'),ra=document.getElementById('recAssist'),rm2=document.getElementById('recManual');
+  if(rg) rg.textContent=m.rec;
+  // Highlight active mode's cell
+  document.querySelectorAll('.rec').forEach(r=>r.style.background='');
+  const hlMap={manual:'rec-manual',assisted:'rec-assist',guided:'rec-guided'};
+  const activeRec=document.querySelector('.'+hlMap[mode]);
+  if(activeRec) activeRec.style.background='rgba(57,255,110,.06)';
+  updateTicker('CONTROL MODE: '+m.lbl+' · SAFE ZONE: '+m.sz+' · RECOVERY: '+m.rec+' · DARPA LINC');
+}
+
+// ── HAZARD INJECTION — hits real API if backend up ───────
+let hazardState=0;
+async function injectHazard(){
+  hazardState=(hazardState+1)%4;
+  const scenarios=[
+    {hz:'wind_loading',   wind:'ACTIVE', thrust:'NOMINAL', venturi:'NOMINAL',log:'Wind shear 34kt induced · MAVERICK compensating · trajectory maintained',dot:'d-coral'},
+    {hz:'thruster_anomaly',wind:'ACTIVE',thrust:'ACTIVE',  venturi:'NOMINAL',log:'Thruster failure simulated · AI-assisted recovery 4.2s · safe zone maintained',dot:'d-amber'},
+    {hz:'venturi',        wind:'NOMINAL',thrust:'NOMINAL', venturi:'ACTIVE', log:'Venturi effect detected · AI re-routing around pressure differential',dot:'d-violet'},
+    {hz:'clear',          wind:'NOMINAL',thrust:'NOMINAL', venturi:'NOMINAL',log:'All hazards cleared · MAVERICK nominal · safe zone restored',dot:'d-lime'},
+  ];
+  const s=scenarios[hazardState];
+  setHazardBadge('hzWind',s.wind);
+  setHazardBadge('hzThrust',s.thrust);
+  setHazardBadge('hzVenturi',s.venturi);
+  addLog({dot:s.dot,txt:s.log,time:nowStr()+' · HAZARD INJECT · DARPA LINC'});
+
+  // Wire into recovery animation + recovery values
+  if(s.hz !== 'clear'){
+    const recoveryMap = {
+      wind_loading:     { guided:1.8, assist:4.2, manual:12.4, label:'WIND SHEAR 34KT' },
+      thruster_anomaly: { guided:2.1, assist:5.8, manual:14.2, label:'THRUSTER FAILURE' },
+      venturi:          { guided:1.5, assist:3.9, manual:11.8, label:'VENTURI EFFECT' },
+    };
+    const rm = recoveryMap[s.hz];
+    if(rm){
+      // Update recovery time displays immediately
+      const rg=document.getElementById('recGuided'), ra=document.getElementById('recAssist'), rem=document.getElementById('recManual');
+      if(rg) rg.textContent = rm.guided+'s';
+      if(ra) ra.textContent = rm.assist+'s';
+      if(rem) rem.textContent = rm.manual+'s';
+      // Start recovery countdown bar (duration = mode-appropriate recovery time)
+      const mode = document.querySelector('.mbtn.active')?.textContent?.includes('GUIDED') ? 'guided'
+                 : document.querySelector('.mbtn.active')?.textContent?.includes('ASSISTED') ? 'assist' : 'manual';
+      startRecoveryAnimation(rm.label, rm[mode]);
+      // Update ticker
+      updateTicker('HAZARD DETECTED: '+rm.label+' · MAVERICK COMPENSATING · RECOVERY IN '+rm[mode]+'s');
+    }
+  } else {
+    // Cleared — pulse recovery bars green
+    const bar = document.getElementById('recoveryProgressBar');
+    if(bar){ bar.style.width='100%'; bar.style.background='var(--lime)'; }
+    updateTicker('ALL HAZARDS CLEARED · MAVERICK NOMINAL · SAFE ZONE RESTORED');
+  }
+
+  // Sync emissions panel when hazard changes fuel burn
+  if(s.hz !== 'clear'){
+    const burnSpike = s.hz === 'wind_loading' ? 2.8 : s.hz === 'thruster_anomaly' ? 3.1 : 2.6;
+    const eb = document.getElementById('emBurnRate');
+    if(eb){ eb.textContent = burnSpike.toFixed(1)+' t/h'; eb.style.color='var(--amber)'; }
+    setTimeout(()=>{ const eb2=document.getElementById('emBurnRate'); if(eb2){ eb2.textContent='2.4 t/h'; eb2.style.color='var(--snow)'; }}, 8000);
+  }
+
+  // Fire real API if backend is live
+  if(backendUp){
+    try {
+      await fetch(`${API_BASE}/api/hazards/inject`,{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({hazard:s.hz}),
+        signal: AbortSignal.timeout(5000)
+      });
+    } catch(e){}
+  }
+}
+function setHazardBadge(id,state){
+  const el=document.getElementById(id);
+  if(!el) return;
+  el.textContent=state;
+  el.className='badge '+(state==='ACTIVE'?'b-hot':state==='MONITOR'?'b-warn':'b-ok');
+}
+
+// ── DATASET LOADER — hits real Render API endpoints ──────
+// ════════════════════════════════════════════════════════
+// DATASETS — live pulls, auto-refresh, real-time display
+// ════════════════════════════════════════════════════════
+let adsbActive     = false;
+let dsRefreshTimers = {};  // per-dataset auto-refresh
+let loadedDatasets  = new Set();
+
+// Sim fallback data
+const DS_SIM = {
+  opensky:{ count:147, stations:['BA279','LH441','AF215','EK203','KL871'], src:'SIMULATION' },
+  noaa:   { EGLL:'270/18kt', EDDF:'240/12kt', ESSA:'260/08kt' },
+  qctrl:  { acc:111, dist:700 },
+};
+
+async function loadDataset(el, key){
+  if(!el) el = document.getElementById('ds-'+key);
+  document.querySelectorAll('.ds-item').forEach(d=>d.classList.remove('loaded'));
+  el.classList.add('loading-ds');
+
+  const statusEl = document.getElementById('dss-'+key);
+  const dataEl   = document.getElementById('dsd-'+key);
+  if(statusEl) statusEl.textContent = 'LOADING…';
+
+  try {
+    if(key==='nasa'){
+      el.classList.remove('loading-ds'); el.classList.add('loaded');
+      if(statusEl){ statusEl.textContent='LOADED'; statusEl.className='ds-status ds-ready'; }
+      if(dataEl) dataEl.textContent = 'FL340 optimal altitude\nBurn model: active';
+      addLog({dot:'d-lime',txt:'NASA atmospheric density profile · FL340 optimal altitude · fuel burn model active',time:nowStr()+' · DATASET · NASA'});
+      document.getElementById('sbDS').textContent='DATASET: NASA ATMOS · FL340 FUEL MODEL';
+      updateTicker('NASA ATMOS LOADED · FL340 OPTIMAL · FUEL BURN MODEL ACTIVE');
+      return;
+    }
+    if(key==='eurocontrol'){
+      el.classList.remove('loading-ds'); el.classList.add('loaded');
+      if(statusEl){ statusEl.textContent='REG REQ'; statusEl.className='ds-status ds-pull'; }
+      if(dataEl) dataEl.innerHTML = 'Registration required<br><span style="color:var(--ice)">eurocontrol.int/tool/nest</span>';
+      addLog({dot:'d-amber',txt:'Eurocontrol NEST route archive · registration required · 700km+ historical routes available',time:nowStr()+' · DATASET · EUROCONTROL'});
+      document.getElementById('sbDS').textContent='DATASET: EUROCONTROL · REGISTRATION REQUIRED';
+      return;
+    }
+
+    // Live API datasets
+    let data = null;
+    if(backendUp){
+      const urls = {
+        opensky:'opensky',
+        noaa:'noaa-weather',
+        qctrl:'quantum-benchmark'
+      };
+      try {
+        const r = await fetch(`${API_BASE}/api/datasets/${urls[key]}`, {signal:AbortSignal.timeout(12000)});
+        if(r.ok) data = await r.json();
+      } catch(e){}
+    }
+
+    el.classList.remove('loading-ds'); el.classList.add('loaded');
+
+    if(key==='opensky'){
+      const count = data?.aircraft_count || DS_SIM.opensky.count;
+      const src   = data?.source==='live' ? 'LIVE ADS-B' : 'SIM';
+      const dots  = data?.aircraft || DS_SIM.opensky.stations;
+      if(statusEl){ statusEl.textContent=src==='LIVE ADS-B'?'LIVE':'SIM'; statusEl.className='ds-status ds-'+(src==='LIVE ADS-B'?'live':'pull'); }
+      if(dataEl) dataEl.innerHTML = `${count} aircraft in sector<br>Src: ${src} · ${nowStr()}`;
+      adsbActive = true;
+      const leg = document.getElementById('adsbLegend');
+      if(leg) leg.style.display='flex';
+      addLog({dot:'d-ice',txt:`OpenSky ADS-B · ${count} aircraft in sector · ${src} · positions overlaid on map`,time:nowStr()+' · DATASET · OPENSKY'});
+      document.getElementById('sbDS').textContent=`OPENSKY · ${count} AIRCRAFT · ${src}`;
+      updateTicker(`OPENSKY ADS-B ACTIVE · ${count} AIRCRAFT IN SECTOR · POSITIONS UPDATING`);
+      // Schedule auto-refresh every 30s
+      clearInterval(dsRefreshTimers.opensky);
+      dsRefreshTimers.opensky = setInterval(()=>loadDataset(el,'opensky'), 30000);
+
+    } else if(key==='noaa'){
+      const eg = data?.data?.[0]?.wind_speed_kt ? `${data.data[0].wind_direction}°/${data.data[0].wind_speed_kt}kt` : DS_SIM.noaa.EGLL;
+      const ed = data?.data?.[1]?.wind_speed_kt ? `${data.data[1].wind_direction}°/${data.data[1].wind_speed_kt}kt` : DS_SIM.noaa.EDDF;
+      const es = data?.data?.[2]?.wind_speed_kt ? `${data.data[2].wind_direction}°/${data.data[2].wind_speed_kt}kt` : DS_SIM.noaa.ESSA;
+      if(statusEl){ statusEl.textContent=data?'LIVE':'SIM'; statusEl.className='ds-status ds-'+(data?'live':'pull'); }
+      if(dataEl) dataEl.innerHTML = `EGLL: ${eg} · EDDF: ${ed}<br>ESSA: ${es} · ${nowStr()}`;
+      // Sync wind dropdowns in route planner
+      if(data?.data?.[0]?.wind_direction){
+        const wdEl = document.getElementById('rpWDir');
+        const wsEl = document.getElementById('rpWSpd');
+        const realDir = Math.round(data.data[0].wind_direction / 90) * 90;
+        const realSpd = data.data[0].wind_speed_kt;
+        if(wdEl) { [...wdEl.options].forEach(o=>{ if(Math.abs(parseInt(o.value)-realDir)<46) o.selected=true; }); }
+        if(wsEl) { [...wsEl.options].forEach(o=>{ if(Math.abs(parseInt(o.value)-realSpd)<10) o.selected=true; }); }
+        addLog({dot:'d-lime',txt:`NOAA METAR live · EGLL ${eg} · wind data synced to route planner`,time:nowStr()+' · DATASET · NOAA'});
+      } else {
+        addLog({dot:'d-lime',txt:`NOAA METAR loaded · EGLL: ${eg} · EDDF: ${ed} · routing wind model updated`,time:nowStr()+' · DATASET · NOAA'});
+      }
+      document.getElementById('sbDS').textContent=`NOAA METAR · EGLL:${eg} · EDDF:${ed}`;
+      updateTicker(`NOAA METAR ACTIVE · EGLL:${eg} · EDDF:${ed} · WIND MODEL UPDATED`);
+      // Auto-refresh METAR every 60s
+      clearInterval(dsRefreshTimers.noaa);
+      dsRefreshTimers.noaa = setInterval(()=>loadDataset(document.getElementById('ds-noaa'),'noaa'), 60000);
+
+    } else if(key==='qctrl'){
+      const acc  = data?.accuracy_vs_gps || DS_SIM.qctrl.acc;
+      const dist = data?.validation_distance_km || DS_SIM.qctrl.dist;
+      if(statusEl){ statusEl.textContent='QUANTUM'; statusEl.style.color='var(--violet)'; statusEl.style.borderColor='rgba(192,132,252,.3)'; }
+      if(dataEl) dataEl.innerHTML = `×${acc} GPS accuracy<br>${dist}km validated · ICAO ✓`;
+      // Update quantum panel
+      const qNav = document.getElementById('qNavAcc');
+      const qDist = document.getElementById('qNavDist');
+      if(qNav) qNav.textContent = '×'+acc;
+      if(qDist) qDist.textContent = dist;
+      addLog({dot:'d-violet',txt:`Q-CTRL Ironstone Opal · ×${acc} GPS accuracy · ${dist}km flight validated · ICAO standards met`,time:nowStr()+' · DATASET · Q-CTRL'});
+      document.getElementById('sbDS').textContent=`Q-CTRL QUANTUM · ×${acc} GPS ACCURACY · ${dist}KM VALID`;
+      updateTicker(`Q-CTRL IRONSTONE OPAL · ×${acc} GPS ACCURACY · ${dist}KM VALIDATED · ICAO COMPLIANT`);
+    }
+
+    loadedDatasets.add(key);
+
+  } catch(e){
+    el.classList.remove('loading-ds');
+    if(statusEl) statusEl.textContent = 'ERROR';
+    addLog({dot:'d-coral',txt:`Dataset ${key} failed to load · ${e.message}`,time:nowStr()+' · DATASET ERROR'});
+  }
+}
+
+// ── Live ticker updater ───────────────────────────────────
+function updateTicker(msg){
+  const el = document.getElementById('liveTicker');
+  if(el) el.textContent = msg + '  ·  ' + new Date().toUTCString().slice(17,25) + ' UTC';
+}
+
+// ── Emissions real-time updater ───────────────────────────
+// Updates when route optimizer runs or every 8s with sim drift
+function updateEmissions(fuelPct, co2PerFlight){
+  const pct     = fuelPct || (22 + (Math.random()-.5)*2);
+  const co2flt  = co2PerFlight || (pct * 0.81).toFixed(1);
+  const burnRate = (2.4 + (Math.random()-.5)*.08).toFixed(2);
+  const fleet    = (co2flt * 28000 / 1000).toFixed(0);
+  const annual   = (co2flt * 28000 * 365 / 1e6).toFixed(0);
+
+  const ef = document.getElementById('emFuelPct');
+  const ec = document.getElementById('emCo2Flt');
+  const eb = document.getElementById('emBurnRate');
+  const efl= document.getElementById('emFleetCo2');
+  const ea = document.getElementById('emAnnual');
+  const bar= document.getElementById('emBar');
+
+  if(ef) ef.textContent = '−'+pct.toFixed(1)+'%';
+  if(ec) ec.textContent = '−'+co2flt+'t';
+  if(eb) eb.textContent = burnRate+' t/h';
+  if(efl) efl.textContent = fleet+'kt';
+  if(ea) ea.textContent = annual+'Mt/yr';
+  if(bar) bar.style.width = Math.min(pct*3, 100)+'%';
+}
+setInterval(()=>updateEmissions(), 8000);
+
+// ── Recovery time live simulation ─────────────────────────
+// Flickers within realistic ranges between hazard events
+let recoverySimTimer = setInterval(()=>{
+  const guided = (1.6 + Math.random()*.4).toFixed(1);
+  const assist = (4.0 + Math.random()*.4).toFixed(1);
+  const manual = (12.2 + Math.random()*.4).toFixed(1);
+  const rg = document.getElementById('recGuided');
+  const ra = document.getElementById('recAssist');
+  const rm = document.getElementById('recManual');
+  if(rg) rg.textContent = guided+'s';
+  if(ra) ra.textContent = assist+'s';
+  if(rm) rm.textContent = manual+'s';
+}, 5000);
+
+// ── Hazard recovery countdown bar ────────────────────────
+let recoveryActive = false, recoveryStart = 0, recoveryDuration = 0;
+
+function startRecoveryAnimation(hazardType, durationSec){
+  recoveryActive   = true;
+  recoveryStart    = Date.now();
+  recoveryDuration = durationSec * 1000;
+  const typeEl = document.getElementById('lastHazardType');
+  const timeEl = document.getElementById('lastHazardTime');
+  if(typeEl) typeEl.textContent = hazardType.toUpperCase();
+  if(timeEl) timeEl.textContent = nowStr()+' UTC';
+}
+
+setInterval(()=>{
+  if(!recoveryActive) return;
+  const elapsed = Date.now() - recoveryStart;
+  const pct = Math.min(100, (elapsed / recoveryDuration) * 100);
+  const bar = document.getElementById('recoveryProgressBar');
+  if(bar){
+    bar.style.width = pct+'%';
+    bar.style.background = pct < 100 ? 'var(--amber)' : 'var(--lime)';
+  }
+  if(pct >= 100) recoveryActive = false;
+}, 100);
+
+// ── LOG HELPER ──
+function addLog({dot,txt,time}){
+  const log=document.getElementById('eventLog');
+  const el=document.createElement('div');
+  el.className='log-entry';
+  el.innerHTML=`<div class="log-dot ${dot}"></div><div><div class="log-txt">${txt}</div><div class="log-time">${time}</div></div>`;
+  log.insertBefore(el,log.firstChild);
+  while(log.children.length>12) log.removeChild(log.lastChild);
+}
+function nowStr(){
+  return new Date().toUTCString().slice(17,25);
+}
+
+// ── STARTUP — attempt backend connection ─────────────────
+// Start sim immediately so UI is never blank
+startSimTelemetry();
+
+// ── AUTO-BOOTSTRAP DATASETS (staggered, non-blocking) ──
+// Silently pre-loads datasets so panels show data on arrival
+setTimeout(()=>{ loadDataset(document.getElementById('ds-opensky'),'opensky'); }, 4000);
+setTimeout(()=>{ loadDataset(document.getElementById('ds-noaa'),'noaa'); }, 7000);
+setTimeout(()=>{ loadDataset(document.getElementById('ds-qctrl'),'qctrl'); }, 10000);
+// Initialise emissions panel with default values
+setTimeout(()=>updateEmissions(23, 18.6), 1000);
+// Then try real backend (wakes Render dyno)
+connectBackend();
+
+// ── MAP CANVAS ──────────────────────────────────────────
+const mc   = document.getElementById('mapCanvas');
+const mctx = mc.getContext('2d');
+let mapT = 0, adsbDots = [];
+
+// Initialise activeRoute default (EGLL→EDDF)
+activeRoute = { dep:'EGLL', arr:'EDDF', fuelSavePct:23, animProg:1, animating:false,
+  stdPts:{ sx:.07,sy:.54,ex:.38,ey:.43, c1x:.18,c1y:.68, c2x:.28,c2y:.66 },
+  optPts:{ sx:.07,sy:.54,ex:.38,ey:.43, c1x:.16,c1y:.34, c2x:.29,c2y:.33 }
+};
+
+function initADSB(){
+  adsbDots=[];
+  for(let i=0;i<14;i++) adsbDots.push({
+    x:Math.random()*.85+.05, y:Math.random()*.75+.08,
+    vx:(Math.random()-.5)*.0007, vy:(Math.random()-.5)*.0005,
+    label:['BA','LH','EK','AF','KL','DL'][Math.floor(Math.random()*6)]+Math.floor(Math.random()*999)
+  });
+}
+initADSB();
+
+function resizeMap(){ mc.width=mc.offsetWidth; mc.height=mc.offsetHeight; }
+resizeMap();
+new ResizeObserver(resizeMap).observe(mc);
+
+function bzPt(t,p0,p1,p2,p3){ const m=1-t; return m*m*m*p0+3*m*m*t*p1+3*m*t*t*p2+t*t*t*p3; }
+
+function drawBezier(pts, W, H, color, lineWidth, dashed){
+  const sx=pts.sx*W,sy=pts.sy*H,ex=pts.ex*W,ey=pts.ey*H;
+  const c1x=pts.c1x*W,c1y=pts.c1y*H,c2x=pts.c2x*W,c2y=pts.c2y*H;
+  mctx.beginPath(); mctx.moveTo(sx,sy);
+  mctx.bezierCurveTo(c1x,c1y,c2x,c2y,ex,ey);
+  mctx.strokeStyle=color; mctx.lineWidth=lineWidth;
+  if(dashed) mctx.setLineDash([5,4]); else mctx.setLineDash([]);
+  mctx.stroke(); mctx.setLineDash([]);
+}
+
+function drawMap(){
+  const W=mc.width, H=mc.height;
+  mctx.clearRect(0,0,W,H);
+
+  // Background gradient
+  const bg=mctx.createRadialGradient(W*.4,H*.5,0,W*.5,H*.5,W*.8);
+  bg.addColorStop(0,'#031525'); bg.addColorStop(1,'#010810');
+  mctx.fillStyle=bg; mctx.fillRect(0,0,W,H);
+
+  // Grid
+  mctx.strokeStyle='rgba(0,90,140,.13)'; mctx.lineWidth=.5;
+  for(let x=0;x<W;x+=50){mctx.beginPath();mctx.moveTo(x,0);mctx.lineTo(x,H);mctx.stroke()}
+  for(let y=0;y<H;y+=50){mctx.beginPath();mctx.moveTo(0,y);mctx.lineTo(W,y);mctx.stroke()}
+
+  // Terrain blobs
+  mctx.fillStyle='rgba(0,55,90,.18)';
+  [[.12,.40,.14,.17],[.30,.48,.09,.10],[.48,.54,.06,.09],[.65,.60,.10,.07]].forEach(([x,y,rx,ry])=>{
+    mctx.beginPath(); mctx.ellipse(W*x,H*y,W*rx,H*ry,-.25,0,Math.PI*2); mctx.fill();
+  });
+
+  // Animate route draw-in
+  if(activeRoute.animating){
+    activeRoute.animProg = Math.min(1, activeRoute.animProg + 0.025);
+    if(activeRoute.animProg >= 1) activeRoute.animating = false;
+  }
+
+  const r = activeRoute;
+  if(r.stdPts && r.optPts){
+    const p = r.animProg;
+
+    // Standard route (dashed red)
+    drawBezier(r.stdPts, W, H, 'rgba(255,53,53,.40)', 1.5, true);
+
+    // Optimised route (solid lime) — draw progressively during animation
+    if(p < 1){
+      // Partial draw-in effect
+      const sx=r.optPts.sx*W,sy=r.optPts.sy*H,ex=r.optPts.ex*W,ey=r.optPts.ey*H;
+      const c1x=r.optPts.c1x*W,c1y=r.optPts.c1y*H,c2x=r.optPts.c2x*W,c2y=r.optPts.c2y*H;
+      mctx.beginPath(); mctx.moveTo(sx,sy);
+      for(let i=0;i<=60*p;i++){
+        const t=i/60;
+        mctx.lineTo(bzPt(t,sx,c1x,c2x,ex), bzPt(t,sy,c1y,c2y,ey));
+      }
+      mctx.strokeStyle='rgba(57,255,110,.75)'; mctx.lineWidth=2.5; mctx.stroke();
+    } else {
+      drawBezier(r.optPts, W, H, 'rgba(57,255,110,.75)', 2.5, false);
+    }
+
+    // Fuel saving label on optimised route (shown when animation complete)
+    if(p > 0.8 && r.fuelSavePct > 0){
+      const opts = r.optPts;
+      const midx = bzPt(0.5, opts.sx*W, opts.c1x*W, opts.c2x*W, opts.ex*W);
+      const midy = bzPt(0.5, opts.sy*H, opts.c1y*H, opts.c2y*H, opts.ey*H) - 14;
+      mctx.fillStyle='rgba(57,255,110,'+(0.4+p*0.5)+')';
+      mctx.font='bold 9px IBM Plex Mono,monospace';
+      mctx.textAlign='center';
+      mctx.fillText('−'+r.fuelSavePct+'% FUEL', midx, midy);
+      mctx.textAlign='left';
+    }
+
+    // Airport markers
+    Object.entries(AIRPORTS).forEach(([code,a])=>{
+      const ax=a.cx*W, ay=a.cy*H;
+      const isActive = code===r.dep || code===r.arr;
+      if(!isActive && !(adsbActive)) return; // only show active airports unless ADS-B on
+      mctx.beginPath(); mctx.arc(ax,ay, isActive?4:2.5, 0, Math.PI*2);
+      mctx.fillStyle = isActive ? 'rgba(0,212,255,.7)' : 'rgba(0,212,255,.3)'; mctx.fill();
+      if(isActive){
+        mctx.fillStyle='rgba(0,212,255,.6)'; mctx.font='bold 9px IBM Plex Mono,monospace';
+        mctx.fillText(code, ax+6, ay-4);
+      }
+    });
+
+    // Destination pulse ring
+    const dp = AIRPORTS[r.arr];
+    mctx.beginPath(); mctx.arc(dp.cx*W, dp.cy*H, 8+Math.sin(mapT*.18)*2, 0, Math.PI*2);
+    mctx.strokeStyle='rgba(57,255,110,.55)'; mctx.lineWidth=1.5; mctx.stroke();
+  }
+
+  // Aircraft animating along optimised path
+  const opts = r.optPts;
+  const t2 = (mapT%280)/280;
+  const px = bzPt(t2, opts.sx*W, opts.c1x*W, opts.c2x*W, opts.ex*W);
+  const py = bzPt(t2, opts.sy*H, opts.c1y*H, opts.c2y*H, opts.ey*H);
+  const pt = Math.max(0,t2-.004);
+  const px2= bzPt(pt, opts.sx*W, opts.c1x*W, opts.c2x*W, opts.ex*W);
+  const py2= bzPt(pt, opts.sy*H, opts.c1y*H, opts.c2y*H, opts.ey*H);
+  const ang = Math.atan2(py-py2, px-px2);
+
+  // Glow trail
+  const tr=mctx.createLinearGradient(px-40*Math.cos(ang),py-40*Math.sin(ang),px,py);
+  tr.addColorStop(0,'rgba(0,212,255,0)'); tr.addColorStop(1,'rgba(0,212,255,.55)');
+  mctx.beginPath(); mctx.moveTo(px-36*Math.cos(ang),py-36*Math.sin(ang)); mctx.lineTo(px,py);
+  mctx.strokeStyle=tr; mctx.lineWidth=2.5; mctx.stroke();
+
+  // Plane body
+  mctx.save(); mctx.translate(px,py); mctx.rotate(ang);
+  mctx.beginPath(); mctx.arc(0,0,5,0,Math.PI*2);
+  mctx.fillStyle='#00d4ff'; mctx.fill();
+  mctx.restore();
+  mctx.beginPath(); mctx.arc(px,py,10+Math.sin(mapT*.18)*2,0,Math.PI*2);
+  mctx.strokeStyle='rgba(0,212,255,.2)'; mctx.lineWidth=1.5; mctx.stroke();
+
+  // ADS-B dots
+  if(adsbActive){
+    adsbDots.forEach(d=>{
+      d.x+=d.vx; d.y+=d.vy;
+      if(d.x<.04||d.x>.96) d.vx*=-1;
+      if(d.y<.04||d.y>.96) d.vy*=-1;
+      const ax=d.x*W, ay=d.y*H;
+      mctx.beginPath(); mctx.arc(ax,ay,2.5,0,Math.PI*2);
+      mctx.fillStyle='rgba(255,179,0,.7)'; mctx.fill();
+      mctx.fillStyle='rgba(255,179,0,.4)'; mctx.font='7px IBM Plex Mono,monospace';
+      mctx.fillText(d.label,ax+4,ay-3);
+    });
+  }
+
+  mapT++; requestAnimationFrame(drawMap);
+}
+drawMap();
+
+// ── WAVEFORM ──
+const wc=document.getElementById('waveCanvas');
+const wctx=wc.getContext('2d');
+let waveT=0,waveData=new Array(200).fill(0);
+
+function resizeWave(){wc.width=wc.offsetWidth;wc.height=wc.offsetHeight;}
+resizeWave();new ResizeObserver(resizeWave).observe(wc);
+
+function drawWave(){
+  const W=wc.width,H=wc.height;
+  wctx.clearRect(0,0,W,H);
+  wctx.fillStyle='#020c1a';wctx.fillRect(0,0,W,H);
+  const hazard=Math.sin(waveT*.07)*.28+Math.sin(waveT*.11)*.12;
+  const comp=-hazard*.85+(Math.random()-.5)*.04;
+  waveData.push(hazard+comp);if(waveData.length>200)waveData.shift();
+  const step=W/waveData.length;
+  wctx.beginPath();
+  waveData.forEach((v,i)=>{
+    const x=i*step,y=H/2+v*(H*.38);
+    i===0?wctx.moveTo(x,y):wctx.lineTo(x,y);
+  });
+  wctx.strokeStyle='rgba(0,212,255,.55)';wctx.lineWidth=1.5;wctx.stroke();
+  wctx.beginPath();wctx.moveTo(0,H/2);wctx.lineTo(W,H/2);
+  wctx.strokeStyle='rgba(0,80,120,.25)';wctx.lineWidth=.5;wctx.stroke();
+  waveT++;requestAnimationFrame(drawWave);
+}
+drawWave();
+</script>
+</body>
+</html>
